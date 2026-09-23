@@ -1,0 +1,48 @@
+{
+  "label": "yolo26n-stock",
+  "timestamp": "2026-09-15T07:56:19.683420+00:00",
+  "mode": "camera",
+  "note": "스톡 베이스라인",
+  "model": {
+    "source": "zoo:luxonis/yolo26-nano:coco-512x288",
+    "input_width": 512,
+    "input_height": 288,
+    "shaves_per_thread": null,
+    "inference_threads": null,
+    "queue_size": 2
+  },
+  "device": {
+    "id": "19443010C19B387E00",
+    "platform": "Platform.RVC2",
+    "connection": "PoE/TCP_IP",
+    "ip": "169.254.1.222"
+  },
+  "config": {
+    "duration_s": 30.0,
+    "warmup_s": 5.0,
+    "camera_fps": 30.0,
+    "report_every": 50
+  },
+  "metrics": {
+    "reports": 10,
+    "messages": 500,
+    "measured_seconds": 29.285,
+    "fps": 17.07,
+    "latency_ms": {
+      "mean": 464.56,
+      "p50": 464.76,
+      "p90": 477.98,
+      "p95": 479.43,
+      "p99": 480.87,
+      "min": 444.74,
+      "max": 484.21,
+      "samples": 500
+    }
+  },
+  "env": {
+    "depthai": "3.10.0",
+    "python": "3.12.3",
+    "host": "henes-ad",
+    "os": "Linux-6.8.0-137-generic-x86_64-with-glibc2.39"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "label": "step01-zoo-nnonly",
+  "timestamp": "2026-09-16T06:07:09.864464+00:00",
+  "mode": "throughput",
+  "note": "step01: 예제가 쓰는 모델의 NN 단독 용량",
+  "model": {
+    "source": "zoo:yolov6-nano",
+    "kind": "archive",
+    "blob_shaves": null,
+    "input_width": 512,
+    "input_height": 384,
+    "shaves_per_thread": null,
+    "inference_threads": null,
+    "queue_size": 2,
+    "on_chip_decode": true
+  },
+  "device": {
+    "id": "19443010C19B387E00",
+    "platform": "Platform.RVC2",
+    "connection": "PoE/TCP_IP",
+    "ip": "169.254.1.222"
+  },
+  "config": {
+    "duration_s": 10.0,
+    "warmup_s": 3.0,
+    "camera_fps": 30.0,
+    "report_every": 20
+  },
+  "metrics": {
+    "reports": 10,
+    "messages": 200,
+    "measured_seconds": 8.865,
+    "fps": 22.56,
+    "latency_ms": null,
+    "latency_note": "throughput 모드에서는 측정하지 않음 - BenchmarkOut이 같은 프레임을 복제해 타임스탬프가 고정되므로 지연값이 무의미함. 지연은 --mode camera 로 잴 것."
+  },
+  "env": {
+    "depthai": "3.10.0",
+    "python": "3.12.3",
+    "host": "henes-ad",
+    "os": "Linux-6.8.0-137-generic-x86_64-with-glibc2.39"
+  }
+}

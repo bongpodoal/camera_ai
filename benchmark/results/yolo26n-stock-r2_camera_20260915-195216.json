@@ -1,0 +1,50 @@
+{
+  "label": "yolo26n-stock-r2",
+  "timestamp": "2026-09-15T10:52:16.585495+00:00",
+  "mode": "camera",
+  "note": "평균 기준선 반복측정 rep2",
+  "model": {
+    "source": "zoo:luxonis/yolo26-nano:coco-512x288",
+    "kind": "archive",
+    "blob_shaves": null,
+    "input_width": 512,
+    "input_height": 288,
+    "shaves_per_thread": null,
+    "inference_threads": null,
+    "queue_size": 2
+  },
+  "device": {
+    "id": "19443010C19B387E00",
+    "platform": "Platform.RVC2",
+    "connection": "PoE/TCP_IP",
+    "ip": "169.254.1.222"
+  },
+  "config": {
+    "duration_s": 10.0,
+    "warmup_s": 3.0,
+    "camera_fps": 30.0,
+    "report_every": 20
+  },
+  "metrics": {
+    "reports": 8,
+    "messages": 160,
+    "measured_seconds": 9.368,
+    "fps": 17.08,
+    "latency_ms": {
+      "mean": 464.82,
+      "p50": 464.35,
+      "p90": 478.21,
+      "p95": 480.14,
+      "p99": 481.03,
+      "min": 444.88,
+      "max": 481.89,
+      "samples": 160
+    }
+  },
+  "env": {
+    "depthai": "3.10.0",
+    "python": "3.12.3",
+    "host": "henes-ad",
+    "os": "Linux-6.8.0-137-generic-x86_64-with-glibc2.39"
+  }
+}

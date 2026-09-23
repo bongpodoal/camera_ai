@@ -1,0 +1,49 @@
+{
+  "label": "yolov8n-traffic-host-640-r3",
+  "timestamp": "2026-09-15T11:31:35.363088+00:00",
+  "mode": "host-cpu",
+  "note": "평균 기준선 rep3",
+  "model": {
+    "source": "local:benchmark/models/yolov8n_traffic_640.onnx",
+    "input_width": 640,
+    "input_height": 640,
+    "shaves_per_thread": null,
+    "inference_threads": null,
+    "queue_size": null
+  },
+  "device": {
+    "id": "x86_64",
+    "platform": "host-cpu",
+    "connection": "n/a",
+    "ip": null
+  },
+  "config": {
+    "duration_s": 10.0,
+    "warmup_s": 3.0,
+    "camera_fps": null,
+    "report_every": null
+  },
+  "metrics": {
+    "reports": 1,
+    "messages": 183,
+    "measured_seconds": 10.051,
+    "fps": 18.21,
+    "latency_ms": {
+      "mean": 54.92,
+      "p50": 54.88,
+      "p90": 55.13,
+      "p95": 55.2,
+      "p99": 55.56,
+      "min": 54.65,
+      "max": 56.39,
+      "samples": 183
+    }
+  },
+  "env": {
+    "onnxruntime": "1.30.0",
+    "python": "3.12.3",
+    "host": "henes-ad",
+    "os": "Linux-6.8.0-137-generic-x86_64-with-glibc2.39",
+    "cpu": "x86_64"
+  }
+}

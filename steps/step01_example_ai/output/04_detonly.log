@@ -1,0 +1,25 @@
+[2026-09-16 15:05:37.076] [depthai] [warning] An optional NETWORK bootloader update is available (installed: 0.0.28, available: 0.0.29). Updating is recommended to improve device discoverability. Run 'depthai --flash' or 'depthai-core/utilities/flash_network_bootloader.py', or see https://docs.luxonis.com/software-v3/depthai/depthai-components/bootloader for more information.
+[19443010C19B387E00] [169.254.1.222] [1789538756.257] [host] [warning] Monitor thread (device: 19443010C19B387E00 [169.254.1.222]) - ping was missed, closing the device connection
+[19443010C19B387E00] [169.254.1.222] [1789538758.258] [host] [warning] Closed connection
+
+[19443010C19B387E00] [169.254.1.222] [1789538758.258] [host] [warning] Attempting to reconnect. Timeout is 10000ms
+
+terminate called after throwing an instance of 'std::invalid_argument'
+  what():  Cannot create XLinkStream using unconnected XLinkConnection
+Stack trace (most recent call last) in thread 122177:
+#13   Object "[0xffffffffffffffff]", at 0xffffffffffffffff, in 
+#12   Object "/lib/x86_64-linux-gnu/libc.so.6", at 0x72905ff29ecb, in 
+#11   Object "/lib/x86_64-linux-gnu/libc.so.6", at 0x72905fe9cb83, in 
+#10   Object "/lib/x86_64-linux-gnu/libstdc++.so.6", at 0x72905ceecdb3, in 
+#9    Object "/home/henes-ad/.local/lib/python3.12/site-packages/depthai.libs/libdepthaicore-32207abc.so", at 0x728fc3996525, in 
+#8    Object "/home/henes-ad/.local/lib/python3.12/site-packages/depthai.libs/libdepthaicore-32207abc.so", at 0x728fc3a9fcbe, in dai::node::internal::XLinkInHost::run()
+#7    Object "/home/henes-ad/.local/lib/python3.12/site-packages/depthai.libs/libdepthaicore-32207abc.so", at 0x728fc36da1f1, in 
+#6    Object "/lib/x86_64-linux-gnu/libstdc++.so.6", at 0x72905cebb390, in __cxa_throw
+#5    Object "/lib/x86_64-linux-gnu/libstdc++.so.6", at 0x72905cea5a54, in std::terminate()
+#4    Object "/lib/x86_64-linux-gnu/libstdc++.so.6", at 0x72905cebb0d9, in 
+#3    Object "/lib/x86_64-linux-gnu/libstdc++.so.6", at 0x72905cea5ff4, in 
+#2    Object "/lib/x86_64-linux-gnu/libc.so.6", at 0x72905fe288fe, in abort
+#1    Object "/lib/x86_64-linux-gnu/libc.so.6", at 0x72905fe4527d, in gsignal
+#0    Object "/lib/x86_64-linux-gnu/libc.so.6", at 0x72905fe9ec0c, in pthread_kill
+Aborted (Signal sent by tkill() 122066 1000)
+timeout: the monitored command dumped core

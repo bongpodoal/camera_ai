@@ -1,0 +1,57 @@
+[2026-09-16 14:59:38.390] [depthai] [warning] An optional NETWORK bootloader update is available (installed: 0.0.28, available: 0.0.29). Updating is recommended to improve device discoverability. Run 'depthai --flash' or 'depthai-core/utilities/flash_network_bootloader.py', or see https://docs.luxonis.com/software-v3/depthai/depthai-components/bootloader for more information.
+Warning: Ignoring XDG_SESSION_TYPE=wayland on Gnome. Use QT_QPA_PLATFORM=wayland to run on Wayland anyway.
+QFontDatabase: Cannot find font directory /home/henes-ad/.local/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/henes-ad/.local/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/henes-ad/.local/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/henes-ad/.local/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+QFontDatabase: Cannot find font directory /home/henes-ad/.local/lib/python3.12/site-packages/cv2/qt/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+FPS: 2.58
+FPS: 19.59
+FPS: 20.26
+FPS: 20.57
+FPS: 20.76
+FPS: 20.87
+FPS: 20.95
+FPS: 21.02
+FPS: 21.06
+FPS: 21.09
+FPS: 21.12
+FPS: 21.14
+FPS: 21.16
+FPS: 21.17
+FPS: 21.18
+FPS: 21.21
+FPS: 21.22
+FPS: 21.23
+FPS: 21.23
+FPS: 21.24
+FPS: 21.24
+FPS: 21.25
+FPS: 21.26
+FPS: 21.26
+FPS: 21.27
+FPS: 21.28
+FPS: 21.28
+FPS: 21.28
+FPS: 21.28
+FPS: 21.29
+FPS: 21.29
+FPS: 21.30
+FPS: 21.30
+FPS: 21.30
+FPS: 21.31
+FPS: 21.31
+FPS: 21.31
+FPS: 21.32
+FPS: 21.32
+FPS: 21.32
+FPS: 21.32
+FPS: 21.33
+FPS: 21.33
+FPS: 21.33
+FPS: 21.33

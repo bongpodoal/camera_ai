@@ -1,0 +1,42 @@
+{
+  "label": "yolov8n-traffic-r2",
+  "timestamp": "2026-09-15T10:54:04.940480+00:00",
+  "mode": "throughput",
+  "note": "평균 기준선 반복측정 rep2",
+  "model": {
+    "source": "blob:benchmark/models/yolov8n_traffic_288x512_openvino_2022.1_6shave.blob",
+    "kind": "blob",
+    "blob_shaves": 6,
+    "input_width": 512,
+    "input_height": 288,
+    "shaves_per_thread": null,
+    "inference_threads": null,
+    "queue_size": 2
+  },
+  "device": {
+    "id": "19443010C19B387E00",
+    "platform": "Platform.RVC2",
+    "connection": "PoE/TCP_IP",
+    "ip": "169.254.1.222"
+  },
+  "config": {
+    "duration_s": 10.0,
+    "warmup_s": 3.0,
+    "camera_fps": 30.0,
+    "report_every": 20
+  },
+  "metrics": {
+    "reports": 16,
+    "messages": 320,
+    "measured_seconds": 9.593,
+    "fps": 33.36,
+    "latency_ms": null,
+    "latency_note": "throughput 모드에서는 측정하지 않음 - BenchmarkOut이 같은 프레임을 복제해 타임스탬프가 고정되므로 지연값이 무의미함. 지연은 --mode camera 로 잴 것."
+  },
+  "env": {
+    "depthai": "3.10.0",
+    "python": "3.12.3",
+    "host": "henes-ad",
+    "os": "Linux-6.8.0-137-generic-x86_64-with-glibc2.39"
+  }
+}

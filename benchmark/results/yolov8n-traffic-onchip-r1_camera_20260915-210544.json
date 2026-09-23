@@ -1,0 +1,51 @@
+{
+  "label": "yolov8n-traffic-onchip-r1",
+  "timestamp": "2026-09-15T12:05:44.802535+00:00",
+  "mode": "camera",
+  "note": "칩 위 디코딩 NNArchive, luxonis/tools 변환",
+  "model": {
+    "source": "local:benchmark/models/yolov8n_traffic_288x512_onchip.tar.xz",
+    "kind": "archive",
+    "blob_shaves": null,
+    "input_width": 512,
+    "input_height": 288,
+    "shaves_per_thread": null,
+    "inference_threads": null,
+    "queue_size": 2,
+    "on_chip_decode": true
+  },
+  "device": {
+    "id": "19443010C19B387E00",
+    "platform": "Platform.RVC2",
+    "connection": "PoE/TCP_IP",
+    "ip": "169.254.1.222"
+  },
+  "config": {
+    "duration_s": 10.0,
+    "warmup_s": 3.0,
+    "camera_fps": 30.0,
+    "report_every": 20
+  },
+  "metrics": {
+    "reports": 13,
+    "messages": 260,
+    "measured_seconds": 8.994,
+    "fps": 28.91,
+    "latency_ms": {
+      "mean": 246.29,
+      "p50": 260.18,
+      "p90": 282.49,
+      "p95": 286.46,
+      "p99": 290.82,
+      "min": 150.72,
+      "max": 292.23,
+      "samples": 260
+    }
+  },
+  "env": {
+    "depthai": "3.10.0",
+    "python": "3.12.3",
+    "host": "henes-ad",
+    "os": "Linux-6.8.0-137-generic-x86_64-with-glibc2.39"
+  }
+}

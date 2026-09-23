@@ -1,0 +1,6 @@
+모델: yolov8n_traffic_288x512_onchip.tar.xz  입력 512x288
+  누적 FPS : 28.62  (858개 / 30.0s)
+  순간 FPS : 28.79
+모델: yolov8n_traffic_288x512_onchip.tar.xz  입력 512x288
+  누적 FPS : 28.61  (857개 / 30.0s)
+  순간 FPS : 28.29
