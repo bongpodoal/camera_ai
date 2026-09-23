@@ -1,0 +1,87 @@
+# Step 03 — 엣지 토출 데이터 기록·검토·CAN 밑작업
+
+**목적:** OAK-D 엣지 YOLO가 실제로 내보내는 데이터를 (1) 정의하고 (2) 시간축으로 최대 5분 기록하고
+(3) 처리한 이미지로 확인하고 (4) CAN으로 받을 수 있는지 확인한다. 파라미터는 50개 이상.
+
+**일자:** 2026-09-23 · **상태:** 카메라 없이 검증 완료. 실제 카메라는 Step 04.
+
+---
+
+## 파일
+
+| 파일 | 기능 |
+|---|---|
+| `params.py` | 파라미터 카탈로그 89개 (이름·단위·출처 API·설명). CSV 열 순서도 여기서 결정 |
+| `edge_logger.py` | 카메라(또는 가짜 소스) → 기록. 최대 300초. CAN 동시 송출 옵션 |
+| `review.py` | 기록 검토: 요약·파라미터 개수, 시각별 이미지, 10초 간격 이미지 모음, 시간 그래프 |
+| `can_bridge.py` | CAN 인코딩·디코딩, 가상 버스 왕복 검증, 기록 재송출, 수신 |
+| `oakd_edge.dbc` | CAN 메시지 정의 (CANoe·SavvyCAN 등에서 그대로 열림) |
+| `common.py` | 박스 그리기, CSV 읽기 |
+| `selftest.sh` | 카메라 없이 전체 흐름 검증 |
+
+## 기록 결과물 (`runs/<시각>_camera/`)
+
+| 파일 | 단위 | 내용 |
+|---|---|---|
+| `session.json` | 1회 | 장치 ID·제품명·모델·입력 크기·캘리브레이션(fx, fy, cx, cy, 기선) + 실행 통계 |
+| `frames.csv` | 프레임당 | 시각 4종, 지연 2종, 누락 수, 카메라 메타데이터(노출·ISO·초점·색온도·화각), 검출 요약 |
+| `detections.csv` | 검출당 | 클래스·신뢰도·박스(정규화·픽셀)·XYZ [mm]·거리·방위각·깊이 ROI |
+| `telemetry.csv` | 1초당 | 칩 온도 5종, LEON CPU 2종, DDR·CMX·힙 메모리 |
+| `frames/NNNNNN.jpg` | 프레임당 | **신경망이 실제로 처리한 이미지** (passthrough, 512×288) |
+| `annotated.mp4` | — | 박스를 그린 영상 |
+| `review/` | — | review.py 산출물 |
+
+`frames.csv`와 `detections.csv`는 `seq`로 결합한다. 시간축은 `t_s`(기록 시작 후 경과 초).
+
+## 파라미터 수
+
+| 파일 | 개수 |
+|---|---|
+| session | 18 |
+| frames | 31 |
+| detections | 27 |
+| telemetry | 17 |
+| **고유 합계** | **89** (t_s·seq·ts_device_s 중복 제외) |
+
+깊이 끄면(`--no-spatial`) XYZ·ROI 11개가 빠져 78개. 모델·펌웨어가 안 주는 값(`angle_deg` 등)은
+Step 04에서 실제로 비는지 확인한다. `review.py summary`가 값이 있는 개수를 센다.
+
+## CAN
+
+**OAK-D PoE에는 CAN 포트가 없다.** 연결은 PoE 이더넷뿐이고, 칩(Myriad X)에도 CAN 제어기가 없다.
+따라서 경로는 하나다:
+
+```
+OAK-D ──이더넷──> 호스트 (edge_logger.py / can_bridge.py) ──USB-CAN 어댑터──> CAN 버스
+```
+
+| ID | 메시지 | 주기 | 내용 |
+|---|---|---|---|
+| 0x300 | FRAME_STATUS | 프레임당 | Seq, DetCount, Fps, LatencyMs, SeqGap, NearestZ |
+| 0x310 | DET_BOX | 검출당 (상위 8개) | SeqLo, Index, Label, Conf, Cx, Cy, W, H (정규화) |
+| 0x320 | DET_POS | 검출당 (깊이 켜짐) | SeqLo, Index, X, Y, Z [mm] |
+| 0x330 | DEV_STATUS | 1 Hz | 칩 온도 평균·최대, CPU 2종, 메모리 4종 [%] |
+
+표준 11비트 ID, 8바이트, 리틀 엔디언.
+
+## 카메라 없이 검증 (selftest.sh 300)
+
+| 항목 | 결과 |
+|---|---|
+| 기록 | 8,909프레임 / 300.0초, 의도한 누락 92개 정확히 검출 |
+| 이미지 | 8,909장 전부 저장, 저장 누락 0 |
+| 파라미터 | 89/89 값 있음 |
+| CAN 왕복 | 송신 53,752 = 수신 53,752, Seq 오차 0, Conf 0.005, Cx 0.00033, Z 0 mm |
+| 버스 점유율 | 500 kbps에서 4.8% (검출 2.5개/프레임 기준) |
+| 용량 | 5분에 1.2 GB (JPEG 8,909장 + 영상) |
+
+가짜 소스는 흐름만 검증한다. 실제 값의 범위·빈 열은 Step 04에서 확인한다.
+
+## 알려진 위험
+
+| 위험 | 대응 |
+|---|---|
+| 깊이 + 신경망 동시 30fps에서 프레임 누락 | `seq_gap`로 기록됨. 많으면 `--fps 20` 또는 `--no-spatial` |
+| 장치 종료 시 크래시 (Step 01) | 종료 전 큐 비움. 연속 실행 사이 15~20초 대기 |
+| 시스템 matplotlib가 numpy 2와 충돌 | 그래프는 OpenCV로 그림 |
+| vcan0 생성에 sudo 필요 | 가상 버스(`virtual`)로 대체 검증함 |

@@ -40,6 +40,8 @@ tools/
 
 steps/          단계별 작업 기록 (과정 중심)
   step01_example_ai/         공식 예제 실행 + FPS 분해
+  step02_traffic_model/      신호등 YOLOv8n 엣지 실행
+  step03_edge_output/        토출 데이터 5분 기록·이미지 검토·CAN 중계 (파라미터 89개)
 ```
 
 ## 빠른 시작

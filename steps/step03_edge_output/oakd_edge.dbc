@@ -1,0 +1,53 @@
+VERSION ""
+
+
+NS_ :
+
+BS_:
+
+BU_: OAKD HOST
+
+
+BO_ 768 FRAME_STATUS: 8 OAKD
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" HOST
+ SG_ DetCount : 16|8@1+ (1,0) [0|255] "" HOST
+ SG_ Fps : 24|16@1+ (0.1,0) [0|6553.5] "fps" HOST
+ SG_ LatencyMs : 40|12@1+ (1,0) [0|4095] "ms" HOST
+ SG_ SeqGap : 52|4@1+ (1,0) [0|15] "" HOST
+ SG_ NearestZ : 56|8@1+ (0.1,0) [0|25.5] "m" HOST
+
+BO_ 784 DET_BOX: 8 OAKD
+ SG_ SeqLo : 0|4@1+ (1,0) [0|15] "" HOST
+ SG_ Index : 4|4@1+ (1,0) [0|15] "" HOST
+ SG_ Label : 8|7@1+ (1,0) [0|127] "" HOST
+ SG_ Conf : 15|7@1+ (0.01,0) [0|1.27] "" HOST
+ SG_ Cx : 22|10@1+ (0.001,0) [0|1.023] "" HOST
+ SG_ Cy : 32|10@1+ (0.001,0) [0|1.023] "" HOST
+ SG_ W : 42|10@1+ (0.001,0) [0|1.023] "" HOST
+ SG_ H : 52|10@1+ (0.001,0) [0|1.023] "" HOST
+
+BO_ 800 DET_POS: 8 OAKD
+ SG_ SeqLo : 0|4@1+ (1,0) [0|15] "" HOST
+ SG_ Index : 4|4@1+ (1,0) [0|15] "" HOST
+ SG_ X : 8|16@1- (1,0) [-32768|32767] "mm" HOST
+ SG_ Y : 24|16@1- (1,0) [-32768|32767] "mm" HOST
+ SG_ Z : 40|16@1+ (1,0) [0|65535] "mm" HOST
+
+BO_ 816 DEV_STATUS: 8 OAKD
+ SG_ TempAvg : 0|8@1+ (0.5,-40) [-40|87.5] "degC" HOST
+ SG_ TempMax : 8|8@1+ (0.5,-40) [-40|87.5] "degC" HOST
+ SG_ CpuCss : 16|8@1+ (1,0) [0|255] "%" HOST
+ SG_ CpuMss : 24|8@1+ (1,0) [0|255] "%" HOST
+ SG_ DdrUsed : 32|8@1+ (0.5,0) [0|127.5] "%" HOST
+ SG_ CmxUsed : 40|8@1+ (0.5,0) [0|127.5] "%" HOST
+ SG_ CssHeap : 48|8@1+ (0.5,0) [0|127.5] "%" HOST
+ SG_ MssHeap : 56|8@1+ (0.5,0) [0|127.5] "%" HOST
+
+
+
+CM_ BO_ 768 "Per frame summary. Sent once per processed frame.";
+CM_ BO_ 784 "One per detection (top N by confidence). Box center/size normalized 0..1.";
+CM_ BO_ 800 "One per detection when depth is enabled. Camera frame: +X right, +Y down, +Z forward.";
+CM_ BO_ 816 "Device telemetry, 1 Hz.";
+CM_ SG_ 768 NearestZ "Nearest detection forward distance. 0 = none or depth disabled.";
+CM_ SG_ 784 SeqLo "Low 4 bits of FRAME_STATUS.Seq, to join detections with their frame.";
