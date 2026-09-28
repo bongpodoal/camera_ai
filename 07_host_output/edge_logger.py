@@ -55,9 +55,19 @@ def _secs(td):
 
 # ====================================================================== 카메라
 def camera_source(args, session):
-    """실제 OAK-D. (이미지, frames 행, detections 행 목록, telemetry 행 목록)을 내보낸다."""
+    """실제 OAK-D. (이미지, frames 행, detections 행 목록, telemetry 행 목록)을 내보낸다.
+
+    이 함수 안에 "NNArchive를 칩에 올리는" 부분(파이프라인 구성)과
+    "호스트가 결과를 받는" 부분(아래 while pipeline.isRunning() 루프)이 같이 있다.
+    """
     import depthai as dai
 
+    # --- 모델 지정: 두 가지 방식 모두 지원 ---------------------------------
+    # 1) --model에 실제 파일 경로(NNArchive .tar.xz)를 주면: dai.NNArchive(경로)로 직접 로드.
+    #    커스텀 모델(자체 컴파일한 superblob+config.json을 패키징한 archive)을 쓸 때 이 경로.
+    # 2) --model에 "yolov6-nano" 같은 이름만 주면: dai.NNModelDescription(이름)만 만들어두고,
+    #    실제 다운로드는 뒤의 DetectionNetwork.build()가 호출될 때 일어난다
+    #    (05_nnarchive/fetch_example.py의 dai.getModelFromZoo와 동일한 동작).
     model_path = Path(args.model)
     if model_path.exists():
         model = dai.NNArchive(str(model_path))
@@ -65,6 +75,7 @@ def camera_source(args, session):
     else:
         model = dai.NNModelDescription(args.model)
 
+    # --- 장치 연결: IP로 직접 붙되, 재부팅 직후처럼 아직 안 보이면 재시도 ---
     device = None
     for attempt in range(1, 6 if args.ip else 1):     # 직전 실행 뒤 장치가 재부팅 중이면 잠시 안 보인다
         try:
@@ -87,54 +98,81 @@ def camera_source(args, session):
         depthai_version=dai.__version__,
     )
 
+    # ============================== NNArchive를 실제로 OAK-D 칩에 올리는 부분 ==============================
     with pipeline:
+        # 카메라 노드: 소켓을 CAM_A(메인 RGB)로 명시. 06_oakd_chip/run_example.py의
+        # 기본형과 달리 여기선 소켓을 직접 지정해 어떤 센서를 쓰는지 확실히 한다.
         cam = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
         if args.spatial:
+            # 거리(Depth) 계산까지 쓰는 경로: 스테레오 좌우 카메라로 깊이 지도를 만드는
+            # Depth 노드를 추가하고, SpatialDetectionNetwork로 검출망 노드를 만든다.
+            # 이 노드는 일반 DetectionNetwork에 "박스마다 depth 지도에서 XYZ 거리도 계산"
+            # 하는 기능이 얹힌 것 — 그래서 칩 부하가 늘어난다 (2절에서 30fps 병목의 원인).
             depth = pipeline.create(dai.node.Depth).build(dai.node.Depth.Algorithm.AUTO, args.fps)
             nn = pipeline.create(dai.node.SpatialDetectionNetwork).build(cam, depth, model, fps=args.fps)
-            nn.setDepthLowerThreshold(100)
-            nn.setDepthUpperThreshold(20000)
+            nn.setDepthLowerThreshold(100)     # 100mm 미만은 깊이값 무효 처리 (센서 최소 거리 근처 잡음)
+            nn.setDepthUpperThreshold(20000)   # 20m 초과도 무효 (스테레오 기선 대비 신뢰 못할 거리)
             nn.spatialLocationCalculator.initialConfig.setSegmentationPassthrough(False)
         else:
+            # 거리 계산 없이 검출만: NNArchive(model)를 카메라 노드에 그대로 붙인다.
+            # — 06_oakd_chip/run_example.py의 DetectionNetwork.build()와 원리는 동일하고,
+            #   fps= 인자로 신경망 처리 주기를 직접 제한한다는 점만 다르다.
             nn = pipeline.create(dai.node.DetectionNetwork).build(cam, model, fps=args.fps)
         if args.conf is not None:
-            nn.setConfidenceThreshold(args.conf)
+            nn.setConfidenceThreshold(args.conf)   # config.json 기본값(보통 0.5) 대신 직접 지정
         labels = nn.getClasses() or []
         session["n_classes"] = len(labels)
         session["conf_threshold"] = _try(nn.getConfidenceThreshold)
 
+        # 시스템 로거: 칩 온도·CPU·메모리 사용량을 1초에 한 번(setRate(1.0)) 장치가
+        # 직접 측정해서 보내주는 노드 — telemetry.csv의 출처가 바로 이거다.
         syslog = pipeline.create(dai.node.SystemLogger)
         syslog.setRate(1.0)
 
+        # 출력 큐 4개 = 칩이 만든 결과를 호스트가 꺼내는 통로.
+        # maxSize=8, blocking=False : 큐가 8개 차면 꽉 찬 상태에서도 get()이 즉시 리턴(논블로킹).
+        #   호스트가 느려도 칩/장치 쪽이 멈추지 않게 하기 위함 (기록 지연이 프레임 손실보다 낫다).
         # passthrough는 반드시 소비한다 (안 만들면 장치가 연결을 끊는다 — Step 01)
-        q_rgb = nn.passthrough.createOutputQueue(maxSize=8, blocking=False)
-        q_det = nn.out.createOutputQueue(maxSize=8, blocking=False)
-        q_sys = syslog.out.createOutputQueue(maxSize=8, blocking=False)
+        q_rgb = nn.passthrough.createOutputQueue(maxSize=8, blocking=False)        # 처리된 영상 프레임
+        q_det = nn.out.createOutputQueue(maxSize=8, blocking=False)               # 검출 결과 (박스)
+        q_sys = syslog.out.createOutputQueue(maxSize=8, blocking=False)           # 칩 온도/CPU/메모리
         q_depth = nn.passthroughDepth.createOutputQueue(maxSize=2, blocking=False) if args.spatial else None
+        # ↑ 깊이 프레임 자체는 이 코드에서 값을 쓰지 않고 큐만 비워준다 (아래 tryGetAll) —
+        #   안 만들면 장치 내부에 깊이 데이터가 쌓여 다른 큐처럼 연결이 끊길 수 있어서다.
 
-        pipeline.start()
+        pipeline.start()  # 지금까지 구성한 그래프를 장치에서 실제로 실행 시작
+        # ============================== 여기부터 "호스트가 검출을 받는" 부분 ==============================
         calib_done = False
+        # frames/dets_by_seq : 프레임 큐와 검출 큐가 "따로" 오기 때문에, 같은 프레임을 가리키는
+        #   프레임(passthrough)과 검출결과(out)를 seq(프레임 순번)로 짝지어야 한다.
+        #   임시로 여기에 쌓아뒀다가 같은 seq가 둘 다 모이면 방출(yield)한다.
         frames, dets_by_seq = {}, {}
         try:
             while pipeline.isRunning():
+                # q_det.get() : 검출 큐는 블로킹으로 하나 기다린다 (루프의 박자를 검출 주기에 맞춤).
                 d = q_det.get()
                 dets_by_seq[d.getSequenceNum()] = (d, dai.Clock.now())
+                # q_rgb.tryGetAll() : 프레임 큐는 논블로킹으로 "그 사이 쌓인 만큼" 한꺼번에 꺼낸다.
                 for f in q_rgb.tryGetAll():
                     frames[f.getSequenceNum()] = (f, dai.Clock.now())
                 if q_depth is not None:
-                    q_depth.tryGetAll()
-                tele = [_telemetry(s) for s in q_sys.tryGetAll()]
+                    q_depth.tryGetAll()  # 깊이 프레임은 안 쓰지만 큐를 비워야 장치가 안 막힌다
+                tele = [_telemetry(s) for s in q_sys.tryGetAll()]  # 1초마다 온 시스템 로그를 파싱
 
+                # 같은 seq를 가진 프레임+검출 쌍이 모인 것만 골라 기록용으로 내보낸다.
                 for seq in sorted(set(frames) & set(dets_by_seq)):
                     f, f_now = frames.pop(seq)
                     d, d_now = dets_by_seq.pop(seq)
-                    img = f.getCvFrame()
+                    img = f.getCvFrame()  # 신경망이 실제로 처리한 그 이미지 (512×288 등, JPEG로 저장됨)
                     if not calib_done:
+                        # 캘리브레이션(초점거리·주점·기선)은 세션당 한 번만 읽으면 되므로 첫 프레임에서만
                         _calibration(device, dai, session, img.shape[1], img.shape[0])
                         calib_done = True
+                    # 여기서 실제로 "이 프레임의 기록 1행 + 이 프레임의 검출 N행"을 만들어 내보낸다.
+                    # main()의 for 루프가 이 값을 받아 CSV에 쓰고(Recorder), CAN으로도 보낸다(있으면).
                     yield img, _frame_row(f, d, f_now, d_now), _det_rows(d, labels, img.shape), tele
-                    tele = []
-                # 짝을 못 찾은 오래된 항목 정리
+                    tele = []  # 텔레메트리는 한 번 방출했으면 다음 프레임에 또 넣지 않음 (중복 방지)
+                # 짝을 못 찾은 오래된 항목 정리 (예: 검출 결과가 통신 문제로 영영 안 온 경우 메모리 누수 방지)
                 newest = max(list(frames) + list(dets_by_seq) + [0])
                 for dct in (frames, dets_by_seq):
                     for s in [s for s in dct if s < newest - 30]:
@@ -147,6 +185,9 @@ def camera_source(args, session):
             pipeline.stop()
 
 
+# --- 이 아래 세 함수(_calibration/_frame_row/_det_rows)와 _telemetry는 전부
+#     "호스트가 칩에서 받은 결과를 사람이 쓸 값으로 정리하는" 코드다.
+#     신경망 연산이나 디코딩은 전혀 하지 않는다 — 그건 이미 칩에서 끝나 있다.
 def _calibration(device, dai, session, w, h):
     try:
         calib = device.readCalibration()
@@ -160,6 +201,8 @@ def _calibration(device, dai, session, w, h):
 
 
 def _frame_row(f, d, f_now, d_now):
+    """frames.csv 한 행. f=ImgFrame(프레임), d=ImgDetections(그 프레임의 검출),
+    f_now/d_now=호스트가 각각을 받은 시각(지연 계산용)."""
     return dict(
         seq=f.getSequenceNum(),
         ts_device_s=_try(f.getTimestampDevice, _secs),
@@ -181,6 +224,9 @@ def _frame_row(f, d, f_now, d_now):
 
 
 def _det_rows(d, labels, shape):
+    """detections.csv 행들 (프레임 하나에 검출이 여러 개면 여러 행).
+    det.xmin/ymin/xmax/ymax 등은 칩이 이미 디코딩·NMS까지 끝낸 최종 박스다 —
+    여기서는 그 값을 꺼내 픽셀 단위로 환산하고, 깊이(spatialCoordinates)가 있으면 같이 담는다."""
     h, w = shape[:2]
     rows = []
     for i, det in enumerate(d.detections):
@@ -190,10 +236,13 @@ def _det_rows(d, labels, shape):
                    xmin=round(det.xmin, 5), ymin=round(det.ymin, 5),
                    xmax=round(det.xmax, 5), ymax=round(det.ymax, 5),
                    angle_deg=_try(det.getAngle, lambda v: round(v, 2)))
+        # spatialCoordinates: --spatial(=SpatialDetectionNetwork)일 때만 검출 객체에 붙어 있다.
+        # 칩이 깊이 지도와 박스를 직접 매칭해서 낸 실좌표(mm) — 호스트는 계산 없이 받기만 한다.
         sc = getattr(det, "spatialCoordinates", None)
         if sc is not None:
             row.update(x_mm=round(sc.x, 1), y_mm=round(sc.y, 1), z_mm=round(sc.z, 1))
             m = det.boundingBoxMapping
+            # roi_* 는 정규화(0~1) 값이 아니라 깊이 프레임 픽셀 좌표다 (실측으로 확인/수정한 부분)
             row.update(roi_x=round(m.roi.x, 5), roi_y=round(m.roi.y, 5),
                        roi_w=round(m.roi.width, 5), roi_h=round(m.roi.height, 5),
                        depth_lo_mm=m.depthThresholds.lowerThreshold,
@@ -203,6 +252,7 @@ def _det_rows(d, labels, shape):
 
 
 def _telemetry(s):
+    """telemetry.csv 한 행. s=SystemInformation (SystemLogger 노드가 1초마다 보낸 칩 상태)."""
     t, css, mss = s.chipTemperature, s.leonCssCpuUsage, s.leonMssCpuUsage
     mb, kb = 1024 * 1024, 1024
     return dict(
@@ -391,7 +441,10 @@ def main():
         from can_bridge import CanPublisher
         pub = CanPublisher(args.can_interface, args.can_channel, args.can_bitrate)
 
-    rec = Recorder(out, args.fps, args.save_every, args.jpeg_quality)
+    rec = Recorder(out, args.fps, args.save_every, args.jpeg_quality)   # CSV·이미지·영상을 별도 스레드로 기록
+    # src : camera_source(실제 OAK-D, 위에서 칩에 올리고 결과 받는 제너레이터) 또는
+    #       mock_source(카메라 없이 흐름만 검증하는 가짜 데이터 제너레이터).
+    #       아래 for 루프 입장에서는 둘 다 (이미지, frame행, det행들, tele행들[, t]) 를 주는 동일한 인터페이스.
     src = mock_source(args, session) if args.source == "mock" else camera_source(args, session)
     print(f"기록 시작 → {out}")
 

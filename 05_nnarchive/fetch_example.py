@@ -31,39 +31,70 @@ EXAMPLES = [
 
 
 def superblob_header(path):
-    """앞 136바이트 = 빅엔디언 u64 17개: [기본 블롭 크기, SHAVE 1..16 패치 크기]."""
+    """앞 136바이트 = 빅엔디언 u64 17개: [기본 블롭 크기, SHAVE 1..16 패치 크기].
+
+    .superblob은 depthai가 만든 컨테이너 포맷이다. 안에는 SHAVE 8코어로 컴파일한
+    "기본 블롭" 하나 + 나머지 1~16코어와의 차이만 담은 "패치" 15개가 들어 있고,
+    장치에 실제로 올라갈 때 dai.NNArchive/DetectionNetwork가 이 헤더를 읽어
+    "기본 블롭 + 필요한 패치"만 골라 조립한다. 이 함수는 그 조립을 직접 하지 않고
+    헤더 숫자만 읽어서 문서화(report.md)하는 용도다 — 실행에는 안 쓰인다.
+    """
     raw = path.read_bytes()
+    # 파일 맨 앞 136바이트(17 × 8바이트)를 빅엔디언 부호없는 64비트 정수 17개로 해석한다.
+    # >17Q 의 '>'는 빅엔디언, '17Q'는 unsigned long long(8바이트) 17개라는 뜻(struct 모듈 포맷).
     vals = struct.unpack_from(">17Q", raw, 0)
-    base, patches = vals[0], vals[1:]
+    base, patches = vals[0], vals[1:]  # 첫 값=기본 블롭 크기, 나머지 16개=SHAVE 1~16 패치 크기
     return dict(file_bytes=len(raw), header_bytes=17 * 8, base_blob_bytes=base,
                 patch_bytes={i + 1: p for i, p in enumerate(patches)},
+                # 패치 크기가 0인 SHAVE 번호 = 기본 블롭이 이미 그 코어 수로 컴파일됐다는 뜻
                 base_shaves=[i + 1 for i, p in enumerate(patches) if p == 0],
+                # 헤더(136B) + 기본블롭 + 모든 패치 합이 실제 파일 크기와 같은지 (자기 검증)
                 consistent=17 * 8 + base + sum(patches) == len(raw))
 
 
 def analyze(slug, out_root):
+    # --- ① NNArchive를 "만드는" 자리 -----------------------------------------
+    # dai.getModelFromZoo(...) : Luxonis 모델 주(zoo)에서 이 모델의 완성된 NNArchive
+    #   (.tar.xz 한 파일 = config.json + buildinfo.json + .superblob 묶음)를 내려받아
+    #   로컬 캐시(~/.cache/depthai/... 또는 ~/Library/Caches/depthai/...)에 저장하고
+    #   그 파일 경로만 돌려준다. 여기서는 이미 완성된 archive를 "받아오는" 것이지,
+    #   블롭을 새로 패키징하는 게 아니다. platform="RVC2"는 이 장치의 칩(Myriad X)용
+    #   빌드를 요청한다는 뜻 — 다른 세대 칩(RVC4 등)은 다른 아카이브가 온다.
     archive = Path(dai.getModelFromZoo(dai.NNModelDescription(slug, platform="RVC2")))
     name = slug.replace("/", "_").replace(":", "_")
     out = out_root / name
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
+    # 압축을 푸는 건 순전히 "안에 뭐가 들었는지 보려고"다. 장치에 올릴 때는
+    # 압축을 풀 필요가 없다 — dai.NNArchive(archive_path)에 tar.xz 경로를 그대로 준다.
     with tarfile.open(archive) as t:
         t.extractall(out, filter="data")
         members = [(m.name, m.size) for m in t.getmembers()]
 
+    # config.json  : 전처리(mean/scale)·후처리(parser, 클래스 수, conf/IoU 문턱) 정의.
+    #                이게 있어야 DetectionNetwork가 superblob의 raw 출력을 박스로 디코딩한다.
+    # buildinfo.json: 실행에는 안 쓰이는 "기록"용 메타데이터 — 어떤 도구·버전으로,
+    #                언제 ONNX→IR→blob을 만들었는지 (Model Optimizer/compile_tool 명령 등)
     cfg = json.loads((out / "config.json").read_text())
     build = json.loads((out / "buildinfo.json").read_text()) if (out / "buildinfo.json").exists() else {}
     m = cfg["model"]
     inp = m["inputs"][0]
     head = m["heads"][0]
     hm = head["metadata"]
+    # --- ② NNArchive "객체" 생성 -----------------------------------------------
+    # dai.NNArchive(경로) : tar.xz 파일 하나(=config.json+buildinfo.json+superblob 묶음)를
+    #   읽어 depthai가 이해하는 파이썬 객체로 만든다. 이 객체를 06_oakd_chip 단계에서
+    #   pipeline.create(dai.node.DetectionNetwork).build(cameraNode, nna) 처럼 그대로 넘기면
+    #   칩에 올라간다. 주의: 이 생성자는 "패키지된 archive 파일 경로"만 받는다 —
+    #   .superblob 파일 하나만 뚝 떼어 넘기면 안 되고, config.json과 함께 패키징돼 있어야 한다.
     nna = dai.NNArchive(str(archive))
 
+    # 실제 .superblob 파일 경로는 config.json 안의 model.metadata.path에 적혀 있다.
     blob_file = out / m["metadata"]["path"]
     sb = superblob_header(blob_file) if blob_file.suffix == ".superblob" else None
-    mo = build.get("cmd_info", {}).get("model_optimizer", [])
-    ct = build.get("cmd_info", {}).get("compile_tool", [])
+    mo = build.get("cmd_info", {}).get("model_optimizer", [])   # ONNX→IR 변환 명령 (③ 단계 기록)
+    ct = build.get("cmd_info", {}).get("compile_tool", [])      # IR→blob 컴파일 명령 (④ 단계 기록)
 
     def arg(cmd, key):
         return cmd[cmd.index(key) + 1] if key in cmd else ""
