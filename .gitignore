@@ -1,5 +1,9 @@
 __pycache__/
 ._*
 .DS_Store
-*/runs/
+**/runs/
 *.superblob
+# traffic_light 중간 생성물 — ②~④ 스크립트로 다시 만든다 (.xml·config.json 은 글자라 남김)
+traffic_light/02_onnx/*.onnx
+traffic_light/03_openvino_ir/*.bin
+traffic_light/04_blob/*.blob

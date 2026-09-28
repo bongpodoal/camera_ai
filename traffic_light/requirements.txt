@@ -1,0 +1,8 @@
+# ①~⑤ 변환용 (카메라 없는 PC 에서도 됨) — 2026-09-28 검증 환경 (Python 3.12, macOS)
+ultralytics==8.4.164
+torch==2.14.0
+onnx==1.23.0
+onnxruntime==1.30.0
+blobconverter
+depthai==3.10.0
+# ⑥⑦ 실행만 할 PC 는 depthai·opencv-python 만 있으면 된다 (저장소 최상단 requirements.txt)

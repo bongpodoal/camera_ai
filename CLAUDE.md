@@ -1,7 +1,7 @@
 # camera_ai — 작업 메모리 (다른 컴퓨터에서 이어서 작업하기 위한 파일)
 
 Claude Code는 이 파일을 자동으로 읽는다. 사람도 이 파일 하나로 맥락을 잡을 수 있게 쓴다.
-마지막 갱신: 2026-09-23.
+마지막 갱신: 2026-09-28.
 
 ## 1. 프로젝트가 무엇인가
 
@@ -22,6 +22,9 @@ OAK-D(Myriad X / RVC2) **공식 예제 모델(YOLOv6n)을 7단계로 나눠 분�
 
 ## 2. 폴더 구조와 상태
 
+최상단은 `example/`(공식 예제 분석) · `traffic_light/`(신호등 모델 직접 변환) · `tools/` 세 갈래 (2026-09-28 재편).
+각 폴더 안에서 실행한다. 아래 표의 경로는 `example/` 기준.
+
 | 단계 | 폴더 | 파일 | 상태 |
 |---|---|---|---|
 | ① .pt | `01_pytorch_pt/` | README만 | 원본 가중치 없음. 이름만 확인. 출처("R2") 미확인 |
@@ -31,12 +34,18 @@ OAK-D(Myriad X / RVC2) **공식 예제 모델(YOLOv6n)을 7단계로 나눠 분�
 | ⑤ NNArchive | `05_nnarchive/` | `fetch_example.py`, `example/` | 두 예제 추출·해석 완료 |
 | ⑥ 칩 | `06_oakd_chip/` | 예제 원본, `run_example.py`, `decompose.py`, `benchmark/`, `step01_record/` | 실행·측정 완료 |
 | ⑦ 호스트 | `07_host_output/` | `params.py`, `edge_logger.py`, `review.py`, `can_bridge.py`, `oakd_edge.dbc`, `common.py`, `selftest.sh` | 실카메라 20초 검증 완료. 5분 본 기록·실제 CAN 미완 |
-| — | `tools/` | `oakd_preview.py` | 카메라 연결 확인용 (AI 없음) |
+| 최소 실행 | `minimal_example/` | `run_yolov6n.py`, `data_logger.py`, `image_saver.py` (+ `_no_comments`) | 5분 실측 완료 (21.4 FPS, 이미지 1500장) |
+| — | `../tools/` | `oakd_preview.py` | 카메라 연결 확인용 (AI 없음) |
 
 ①~④가 비어 있는 이유: Luxonis는 최종 NNArchive만 배포한다. 중간 파일은 `buildinfo.json`의 기록으로만 분석한다.
 
+**`traffic_light/`** — `~/camera`(RealSense 신호등 프로젝트)의 `traffic_light.pt`(YOLO11s, red/yellow/green/off)를
+YOLOv8n 예제(T7 외장하드 `camera_ai/*/yolov8n/`, 실카메라 검증 19 FPS)와 같은 절차로 ①~⑦ 구성. 상세: `traffic_light/README.md`.
+①~⑤ 실행·검증 완료(카메라 없이), ⑥⑦ 실카메라 미실행.
+
 ## 3. 다음 할 일 (우선순위)
 
+0. `traffic_light/` ⑥⑦ 실카메라 실행 → 칩 FPS(목표 5 이상)·실제 신호등 인식 확인. yolo11s 라 YOLOv8n(19 FPS)보다 느릴 것
 1. ④ superblob에서 기본 블롭(SHAVE 8) 떼어 `04_blob/`에 저장 — 바로 가능
 2. ⑦ 실제 카메라 **5분** 본 기록 → `review.py summary`로 파라미터 50개 이상 확인
 3. ⑦ CAN: `vcan0`(sudo 필요) → USB-CAN 어댑터 (이 PC에는 어댑터 없음)
@@ -49,11 +58,11 @@ OAK-D(Myriad X / RVC2) **공식 예제 모델(YOLOv6n)을 7단계로 나눠 분�
 ```bash
 git clone https://github.com/bongpodoal/camera_ai.git && cd camera_ai
 python3 -m pip install --user -r requirements.txt     # Ubuntu 24+: --break-system-packages 필요할 수 있음
-cd 07_host_output && ./selftest.sh 20                 # 카메라 없이 전체 흐름 검증 (통과해야 정상)
+cd example/07_host_output && ./selftest.sh 20         # 카메라 없이 전체 흐름 검증 (통과해야 정상)
 cd .. && python3 05_nnarchive/fetch_example.py        # 예제 모델 받기 + superblob 복원 (git에 없음)
 ```
 
-git에 없는 것: `*.superblob`(용량), `07_host_output/runs/`(5분 기록 ≈ 1.2 GB).
+git에 없는 것: `*.superblob`(용량), `**/runs/`(5분 기록 ≈ 1.2 GB), `traffic_light/` 의 `.onnx`·`.bin`·`.blob`(②~④로 재생성).
 
 ## 5. 장치 연결 (가장 많이 막히는 곳)
 
@@ -124,6 +133,7 @@ nmcli connection up oak-poe && ping -c 2 169.254.1.222
 ## 9. 자주 쓰는 명령
 
 ```bash
+cd example
 python3 05_nnarchive/fetch_example.py
 python3 06_oakd_chip/run_example.py 169.254.1.222                       # q로 종료
 python3 06_oakd_chip/benchmark/edge_benchmark.py --model yolov6-nano --ip 169.254.1.222 \
@@ -132,4 +142,10 @@ cd 07_host_output
 python3 edge_logger.py --ip 169.254.1.222 --duration 300                # 5분
 python3 review.py summary|frame|sheet|timeline runs/<폴더> [...]
 python3 can_bridge.py dbc|selftest|replay|listen [...]
+
+cd traffic_light                                                         # 신호등 모델
+python3 01_pytorch_pt/get_pt.py && python3 02_onnx/export_onnx.py       # ①② (로컬)
+python3 03_openvino_ir/convert_ir.py && python3 04_blob/compile_blob.py # ③④ (인터넷)
+python3 05_nnarchive/make_nnarchive.py                                  # ⑤
+python3 07_host_output/run_with_logging.py --duration 60                # ⑥+기록 (카메라)
 ```

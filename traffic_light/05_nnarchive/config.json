@@ -1,0 +1,104 @@
+{
+  "config_version": "1.0",
+  "model": {
+    "metadata": {
+      "name": "traffic_light-512x288",
+      "path": "traffic_light-512x288.blob",
+      "precision": "float16"
+    },
+    "inputs": [
+      {
+        "name": "images",
+        "dtype": "uint8",
+        "input_type": "image",
+        "shape": [
+          1,
+          3,
+          288,
+          512
+        ],
+        "layout": "NCHW",
+        "preprocessing": {
+          "mean": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "reverse_channels": false,
+          "interleaved_to_planar": false,
+          "dai_type": "BGR888p"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "output1_yolov8",
+        "dtype": "float32",
+        "shape": [
+          1,
+          9,
+          36,
+          64
+        ],
+        "layout": "NCDE"
+      },
+      {
+        "name": "output2_yolov8",
+        "dtype": "float32",
+        "shape": [
+          1,
+          9,
+          18,
+          32
+        ],
+        "layout": "NCDE"
+      },
+      {
+        "name": "output3_yolov8",
+        "dtype": "float32",
+        "shape": [
+          1,
+          9,
+          9,
+          16
+        ],
+        "layout": "NCDE"
+      }
+    ],
+    "heads": [
+      {
+        "name": null,
+        "parser": "YOLO",
+        "metadata": {
+          "classes": [
+            "red",
+            "yellow",
+            "green",
+            "off"
+          ],
+          "n_classes": 4,
+          "iou_threshold": 0.5,
+          "conf_threshold": 0.35,
+          "max_det": 300,
+          "anchors": null,
+          "yolo_outputs": [
+            "output1_yolov8",
+            "output2_yolov8",
+            "output3_yolov8"
+          ],
+          "subtype": "yolov8"
+        },
+        "outputs": [
+          "output1_yolov8",
+          "output2_yolov8",
+          "output3_yolov8"
+        ]
+      }
+    ]
+  }
+}

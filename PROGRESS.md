@@ -18,6 +18,16 @@ CAN으로 받을 수 있는지 확인하고, 파라미터 50개 이상을 추출
 | ⑥ OAK-D 칩 | 예제 실행·FPS 분해 완료 (2026-09-16) | `06_oakd_chip/step01_record/NOTES.md` |
 | ⑦ 호스트 | 밑작업 완료, 카메라 없이 검증 (2026-09-23). 실제 5분 기록·CAN 확인 예정 | `07_host_output/NOTES.md` |
 
+## 신호등 모델 직접 변환 (2026-09-28, `traffic_light/`)
+
+`~/camera` 의 `traffic_light.pt` (YOLO11s, red/yellow/green/off) 를 YOLOv8n 예제와 같은 절차로.
+
+| 단계 | 결과 |
+|---|---|
+| ①~⑤ | ONNX `[1, 9, H, W]`×3 → IR(전처리 내장) → blob(SHAVE 8, 19.8 MB) → NNArchive(17.1 MB, conf 0.35) |
+| 검증 | `chip_forward` = 원본 출력 층(오차 0.0008 px). 칩 경로 흉내(ONNX→FP16→depthai 해석기)로 합성 빨간불 `red 0.76`, 초록불 `green 0.81` — 원본과 동일 |
+| ⑥⑦ | 실카메라 미실행 (FPS·실제 인식률 미확인) |
+
 ## 다음
 
 1. ⑥ 실행 로그에서 실제 SHAVE 배분 확인
