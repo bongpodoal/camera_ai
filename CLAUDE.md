@@ -45,7 +45,14 @@ YOLOv8n 예제(T7 외장하드 `camera_ai/*/yolov8n/`, 실카메라 검증 19 FP
 
 ## 3. 다음 할 일 (우선순위)
 
-0. `traffic_light/` ⑥⑦ 실카메라 실행 → 칩 FPS(목표 5 이상)·실제 신호등 인식 확인. yolo11s 라 YOLOv8n(19 FPS)보다 느릴 것
+0. **(2026-09-29 인계, 카메라 PC에서 바로)** `traffic_light/` 5분 실측 — 예제와 같은 조건(시간축 기록 + 이미지 1초 5장).
+   `.tar.xz` 는 git에 있으므로 pull 후 바로 된다:
+   ```bash
+   cd traffic_light && python3 07_host_output/run_with_logging.py --duration 300
+   ```
+   결과 `07_host_output/runs/<시각>/summary.json` 의 `detections.rate_hz` = 칩 FPS (목표 5 이상, yolo11s 라 YOLOv8n 19 FPS보다 느릴 것).
+   끝나면 예제 YOLOv6n(21.4 FPS)·YOLOv8n(19 FPS)과 비교표를 `traffic_light/README.md` "아직 확인 못 한 것" 자리에 채운다.
+   순서: ① 실내 아무 데서 FPS·안정성 → ② 모니터에 신호등 영상 띄워 칩 검출 확인 → ③ 실제 교차로(거리·가로형 신호등)
 1. ④ superblob에서 기본 블롭(SHAVE 8) 떼어 `04_blob/`에 저장 — 바로 가능
 2. ⑦ 실제 카메라 **5분** 본 기록 → `review.py summary`로 파라미터 50개 이상 확인
 3. ⑦ CAN: `vcan0`(sudo 필요) → USB-CAN 어댑터 (이 PC에는 어댑터 없음)
@@ -119,6 +126,9 @@ nmcli connection up oak-poe && ping -c 2 169.254.1.222
 - **과정이 중요하다.** 단계마다 기록(`NOTES.md`, `PROGRESS.md`)을 남긴다. 결과만 남기지 말 것.
 - 문서는 **표 위주, 설명 문장 최소.** 약어는 처음에 풀어 쓴다. 군더더기 삭제를 여러 번 요청받았다.
 - 실제 장치 명령 전에 준비·검증부터. 한국어로 답한다.
+- 코드·개념 설명은 **초보자 눈높이로 한 줄씩** (비유 + 표 + 전체 흐름 요약). 이 방식에 만족했다.
+- 스크립트는 **설명 주석판(`*.py`) + 주석 없는 판(`*_no_comments.py`)** 두 벌을 같은 폴더에 둔다. 결과 파일은 두 판이 같아야 한다.
+- 모델 가중치 공개 여부는 사용자가 정한다. 현재 `traffic_light-512x288.tar.xz` 만 공개 커밋 허락, `traffic_light.pt` 는 비공개(이 맥 `~/camera/deploy/`).
 - 이 저장소는 **공개**다. 토큰·비밀번호를 커밋하지 말 것.
 
 ## 8. 발행 문서 (claude.ai, 비공개 링크)

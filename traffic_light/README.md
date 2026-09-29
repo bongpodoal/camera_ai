@@ -75,5 +75,6 @@ depthai 해석기의 NMS(겹친 박스 정리)는 **클래스 구분 없이** �
 |---|---|
 | 스크립트, `.xml`, `config.json` | 있음 |
 | `.onnx`, `.bin`, `.blob` | 없음 (②~④로 다시 만듦) |
-| `traffic_light.pt`, `.tar.xz` | 커밋 여부 미정 — 카메라 PC 로 옮기려면 둘 중 하나는 필요 |
+| `traffic_light-512x288.tar.xz` | 있음 — 카메라 PC 에서 pull 만 하면 ⑥⑦ 실행 가능 |
+| `traffic_light.pt` | 없음 (비공개). ①~⑤를 다시 하려면 원본 PC 의 `~/camera/deploy/traffic_light.pt` 필요 |
 | `07_host_output/runs/` | 없음 |
