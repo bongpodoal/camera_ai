@@ -1,0 +1,4 @@
+model,frames,fps_avg,edge_latency_ms_median,edge_latency_ms_p95,pc_latency_ms_median,pc_latency_ms_p95,total_latency_ms_median,total_latency_ms_p95,edge_share_pct
+yolov6n,205,20.85,370.6,385.4,6.9,8.2,378.0,393.7,98.0
+yolov8n,182,18.61,418.5,432.7,5.8,7.3,425.6,439.4,98.3
+traffic_light,94,9.66,818.8,833.3,6.6,7.7,826.2,840.4,99.1

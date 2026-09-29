@@ -1,7 +1,7 @@
 # camera_ai — 작업 메모리 (다른 컴퓨터에서 이어서 작업하기 위한 파일)
 
 Claude Code는 이 파일을 자동으로 읽는다. 사람도 이 파일 하나로 맥락을 잡을 수 있게 쓴다.
-마지막 갱신: 2026-09-28.
+마지막 갱신: 2026-09-29.
 
 ## 1. 프로젝트가 무엇인가
 
@@ -36,23 +36,21 @@ OAK-D(Myriad X / RVC2) **공식 예제 모델(YOLOv6n)을 7단계로 나눠 분�
 | ⑦ 호스트 | `07_host_output/` | `params.py`, `edge_logger.py`, `review.py`, `can_bridge.py`, `oakd_edge.dbc`, `common.py`, `selftest.sh` | 실카메라 20초 검증 완료. 5분 본 기록·실제 CAN 미완 |
 | 최소 실행 | `minimal_example/` | `run_yolov6n.py`, `data_logger.py`, `image_saver.py` (+ `_no_comments`) | 5분 실측 완료 (21.4 FPS, 이미지 1500장) |
 | — | `../tools/` | `oakd_preview.py` | 카메라 연결 확인용 (AI 없음) |
+| — | `../tools/` | `latency_test.py` (+ `_no_comments`), `latency_runs/` | 지연 분해 측정 (엣지/PC/총). 3모델 10초 측정 완료 (2026-09-29) |
 
 ①~④가 비어 있는 이유: Luxonis는 최종 NNArchive만 배포한다. 중간 파일은 `buildinfo.json`의 기록으로만 분석한다.
 
 **`traffic_light/`** — `~/camera`(RealSense 신호등 프로젝트)의 `traffic_light.pt`(YOLO11s, red/yellow/green/off)를
 YOLOv8n 예제(T7 외장하드 `camera_ai/*/yolov8n/`, 실카메라 검증 19 FPS)와 같은 절차로 ①~⑦ 구성. 상세: `traffic_light/README.md`.
-①~⑤ 실행·검증 완료(카메라 없이), ⑥⑦ 실카메라 미실행.
+①~⑤ 실행·검증 완료(카메라 없이). ⑦ 실카메라 5분 실측 완료(2026-09-29, **9.75 FPS**, 지연 중앙 821 ms). 실제 신호등 인식률 미확인.
 
 ## 3. 다음 할 일 (우선순위)
 
-0. **(2026-09-29 인계, 카메라 PC에서 바로)** `traffic_light/` 5분 실측 — 예제와 같은 조건(시간축 기록 + 이미지 1초 5장).
-   `.tar.xz` 는 git에 있으므로 pull 후 바로 된다:
-   ```bash
-   cd traffic_light && python3 07_host_output/run_with_logging.py --duration 300
-   ```
-   결과 `07_host_output/runs/<시각>/summary.json` 의 `detections.rate_hz` = 칩 FPS (목표 5 이상, yolo11s 라 YOLOv8n 19 FPS보다 느릴 것).
-   끝나면 예제 YOLOv6n(21.4 FPS)·YOLOv8n(19 FPS)과 비교표를 `traffic_light/README.md` "아직 확인 못 한 것" 자리에 채운다.
-   순서: ① 실내 아무 데서 FPS·안정성 → ② 모니터에 신호등 영상 띄워 칩 검출 확인 → ③ 실제 교차로(거리·가로형 신호등)
+0. **`traffic_light/` 인식 확인** — 5분 실측(FPS·안정성)은 끝남 (6절 표). 남은 순서:
+   ② 모니터에 신호등 영상 띄워 칩 검출 확인 → ③ 실제 교차로(거리·가로형 신호등).
+   5분 실측에서 849/2916 프레임에 검출이 나옴(yellow 1377·green 332·red 73개) → 장면 기록이 없어 오검출인지 이미지로 확인 필요
+   (이미지 1500장은 git 제외, 카메라 PC의 `traffic_light/07_host_output/runs/20260929_160337/`).
+   지연 821 ms 는 **칩 안(엣지)에서 생김** (2026-09-29 분해 측정, 6절). 카메라 FPS를 AI 속도(≈10)에 맞춰 줄어드는지 확인.
 1. ④ superblob에서 기본 블롭(SHAVE 8) 떼어 `04_blob/`에 저장 — 바로 가능
 2. ⑦ 실제 카메라 **5분** 본 기록 → `review.py summary`로 파라미터 50개 이상 확인
 3. ⑦ CAN: `vcan0`(sudo 필요) → USB-CAN 어댑터 (이 PC에는 어댑터 없음)
@@ -91,7 +89,12 @@ nmcli connection up oak-poe && ping -c 2 169.254.1.222
 - 장치가 파이프라인 시작/종료 때 **재부팅하며 링크가 몇 초 끊긴다.** 연속 실행 사이 15~20초 대기.
 - 원래 PC에서는 그 순간 **다른 자동 연결 프로필(`LIDAR`, 192.168.1.102/24)이 이더넷을 가로챘다.** 증상: `No available devices` / `X_LINK_DEVICE_NOT_FOUND`, ping 실패. `nmcli -t connection show --active`로 확인 → `nmcli connection up oak-poe`. 그 프로필은 EV_racing 라이다용이라 건드리지 않음.
 - `passthrough` 큐를 만들지 않으면 장치가 연결을 끊는다. 항상 만들고 읽는다.
-- 종료 시 크래시 덤프가 자주 남는다(`~/.cache/depthai/crashdumps/`). 종료 전 큐를 비운다.
+- 종료 시 크래시 덤프가 자주 남는다(`~/.cache/depthai/crashdumps/`). 종료 전 큐를 비운다. 연속 실행 때 다음 실행이 `Device already closed` 로 실패하면 30초 더 기다린다.
+- **두 번째 PC (2026-09-29, 이더넷 `enp5s0`):** 자동 연결 프로필 `Wired connection 4` 가 링크 끊김 때 가로챈다. 연속 측정 동안만
+  `nmcli connection modify oak-poe connection.autoconnect yes connection.autoconnect-priority 100` → 끝나면 `no` / `0` 으로 되돌린다.
+  시스템 depthai 는 2.30(다른 프로젝트용) → 이 저장소는 venv `~/venvs/camera_ai` (depthai 3.10, Python 3.10) 로 실행.
+- **칩 Script 노드 함정:** Script 안에서 `msg.getTimestamp()` 를 부르면 펌웨어 크래시. 칩 시계끼리(`Clock.now()`, `getTimestampDevice()`) 뺀다.
+  `Buffer.setData()` 는 list 가 아니라 bytes 를 받는다 (list 면 TypeError 로 Script 가 멈춤).
 
 ## 6. 핵심 사실 (실측)
 
@@ -115,6 +118,26 @@ nmcli connection up oak-poe && ping -c 2 169.254.1.222
 | 거리 계산 켬 · 30fps | 22.4 | 25% | 358 ms | 89/89 |
 | 거리 계산 끔 · 30fps | 30.2 | 0 | 57 ms | 77/89 |
 | 거리 계산 켬 · 20fps (**기본값**) | 20.3 | 0 | 90 ms | 89/89 |
+
+**5분 실측 비교 (실카메라, 이미지 1초 5장 저장):**
+
+| 모델 | 칩 FPS | PC 수신 지연 중앙 | 칩 온도 시작→끝 | 기록 |
+|---|---|---|---|---|
+| YOLOv6n 예제 (`minimal_example`) | 21.41 | 372 ms | 40.6 → 52.3°C | `example/minimal_example/runs/20260928_153518` |
+| YOLOv8n 예제 (T7 외장하드) | 19 | — | — | — |
+| 신호등 YOLO11s (`traffic_light`) | **9.75** (1초 구간 9.65~9.81) | 821 ms | 42.1 → 53.4°C | `traffic_light/07_host_output/runs/20260929_160337` |
+
+**지연 분해 (2026-09-29, 두 번째 PC, 10초씩, 중앙값):** `tools/latency_test.py` → `tools/latency_runs/20260929/`
+
+| 모델 | FPS | 엣지 지연 | PC 지연 | 총 지연 | 엣지 비중 |
+|---|---|---|---|---|---|
+| YOLOv6n | 20.85 | 371 ms | 6.9 ms | 378 ms | 98% |
+| YOLOv8n | 18.61 | 419 ms | 5.8 ms | 426 ms | 98% |
+| 신호등 YOLO11s | 9.66 | 819 ms | 6.6 ms | 826 ms | 99% |
+
+- 엣지 = 칩에서 AI 결과가 나온 시각 − 촬영 시각 (칩 Script 노드가 칩 시계로 잼). PC = 총 − 엣지 (이더넷 + PC 큐).
+- 총 지연은 원래 PC 5분 기록과 같다 (372→378, 821→826 ms) → **PC를 바꿔도 지연은 그대로, 거의 전부 칩 안.**
+- 추정 원인 (미확인): 카메라 30 FPS > AI 처리 속도 → 프레임이 칩 안 AI 입력에서 대기. 순번이 3씩 건너뛰는데 지연은 추론 1회(≈100 ms)의 약 8배.
 
 - **OAK-D PoE에는 CAN 포트가 없다.** 호스트가 USB-CAN으로 중계 (`can_bridge.py`, `oakd_edge.dbc`).
 - `roi_*`는 깊이 프레임 **픽셀** 값. `lens_pos`는 고정초점이라 -1.
