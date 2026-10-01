@@ -11,18 +11,23 @@
 #   --reverse_input_channels     : 카메라의 BGR 순서를 모델이 배운 RGB 순서로 바꾸기
 # 그래서 ⑤ config.json 에는 전처리를 적지 않는다 (둘 다 하면 검출이 0개가 된다).
 #
-# 실행:  python3 03_openvino_ir/convert_ir.py
-# 결과:  03_openvino_ir/traffic_light-512x288.xml, .bin
+# 실행:  python3 03_openvino_ir/convert_ir.py  [크기 [이름]]   예) 416x416 traffic_light_11n (없으면 512x288 traffic_light)
+# 결과:  03_openvino_ir/<이름>-<크기>.xml, .bin
 # ============================================================================
 
 import zipfile                      # 서버가 돌려준 zip 을 풀려고
+import sys                          # 실행 인자(입력 크기·모델 이름) 읽기
 from pathlib import Path
 
 import blobconverter                # Luxonis 변환 서버에 파일을 보내고 결과를 받는 도구
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-onnx_path = ROOT / "02_onnx" / "traffic_light-512x288.onnx"
+# 입력 크기 = ②에서 만든 파일 이름의 크기. 예) 416x416. 인자가 없으면 512x288.
+SIZE = sys.argv[1] if len(sys.argv) > 1 else "512x288"
+# 모델 이름 = 01_pytorch_pt/<이름>.pt 와 결과 파일 이름. 예) traffic_light_11n. 인자가 없으면 traffic_light (YOLO11s).
+NAME = sys.argv[2] if len(sys.argv) > 2 else "traffic_light"
+onnx_path = ROOT / "02_onnx" / f"{NAME}-{SIZE}.onnx"
 
 blobconverter.set_defaults(silent=True)                 # 진행 막대 출력 끄기
 # download_ir=True : blob 만이 아니라 중간 결과인 IR 도 zip 으로 받는다.

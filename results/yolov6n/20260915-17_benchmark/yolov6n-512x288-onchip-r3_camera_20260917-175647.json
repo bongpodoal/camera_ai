@@ -1,0 +1,51 @@
+{
+  "label": "yolov6n-512x288-onchip-r3",
+  "timestamp": "2026-09-17T08:56:47.542405+00:00",
+  "mode": "camera",
+  "note": "Step01 칩 위 디코딩 지연 측정 (호스트 디코딩 yolov6n-stock camera와 동일 조건)",
+  "model": {
+    "source": "zoo:luxonis/yolov6-nano:r2-coco-512x288",
+    "kind": "archive",
+    "blob_shaves": null,
+    "input_width": 512,
+    "input_height": 288,
+    "shaves_per_thread": null,
+    "inference_threads": null,
+    "queue_size": 2,
+    "on_chip_decode": true
+  },
+  "device": {
+    "id": "19443010C19B387E00",
+    "platform": "Platform.RVC2",
+    "connection": "PoE/TCP_IP",
+    "ip": "169.254.1.222"
+  },
+  "config": {
+    "duration_s": 10.0,
+    "warmup_s": 3.0,
+    "camera_fps": 30.0,
+    "report_every": 20
+  },
+  "metrics": {
+    "reports": 14,
+    "messages": 280,
+    "measured_seconds": 9.33,
+    "fps": 30.01,
+    "latency_ms": {
+      "mean": 50.93,
+      "p50": 50.93,
+      "p90": 51.02,
+      "p95": 51.03,
+      "p99": 51.3,
+      "min": 50.7,
+      "max": 51.51,
+      "samples": 280
+    }
+  },
+  "env": {
+    "depthai": "3.10.0",
+    "python": "3.12.3",
+    "host": "henes-ad",
+    "os": "Linux-6.8.0-137-generic-x86_64-with-glibc2.39"
+  }
+}

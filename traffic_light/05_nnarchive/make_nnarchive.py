@@ -13,12 +13,13 @@
 #   conf 0.35 : 신호등은 작고 흐리게 찍혀 확신도가 낮게 나오는 일이 많아 예제(0.5)보다 낮춤
 #   iou  0.5  : 예제와 같음
 #
-# 실행:  python3 05_nnarchive/make_nnarchive.py
-# 결과:  05_nnarchive/config.json, traffic_light-512x288.tar.xz
+# 실행:  python3 05_nnarchive/make_nnarchive.py  [크기 [이름]]   예) 416x416 traffic_light_11n (없으면 512x288 traffic_light)
+# 결과:  05_nnarchive/config.json, <이름>-<크기>.tar.xz
 # ============================================================================
 
 import json
 import tarfile                      # .tar.xz 묶음 파일을 만들려고
+import sys                          # 실행 인자(입력 크기·모델 이름) 읽기
 from pathlib import Path
 
 import depthai as dai               # 만든 아카이브가 depthai 에서 열리는지 확인하려고
@@ -27,10 +28,14 @@ from ultralytics import YOLO        # ① .pt 에서 클래스 이름 4개를 �
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-pt_path = ROOT / "01_pytorch_pt" / "traffic_light.pt"
-onnx_path = ROOT / "02_onnx" / "traffic_light-512x288.onnx"
-blob_path = ROOT / "04_blob" / "traffic_light-512x288.blob"
-archive_path = HERE / "traffic_light-512x288.tar.xz"
+# 입력 크기 = ②에서 만든 파일 이름의 크기. 예) 416x416. 인자가 없으면 512x288.
+SIZE = sys.argv[1] if len(sys.argv) > 1 else "512x288"
+# 모델 이름 = 01_pytorch_pt/<이름>.pt 와 결과 파일 이름. 예) traffic_light_11n. 인자가 없으면 traffic_light (YOLO11s).
+NAME = sys.argv[2] if len(sys.argv) > 2 else "traffic_light"
+pt_path = ROOT / "01_pytorch_pt" / f"{NAME}.pt"
+onnx_path = ROOT / "02_onnx" / f"{NAME}-{SIZE}.onnx"
+blob_path = ROOT / "04_blob" / f"{NAME}-{SIZE}.blob"
+archive_path = HERE / f"{NAME}-{SIZE}.tar.xz"
 
 
 def shape_of(tensor):

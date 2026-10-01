@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 from pathlib import Path
 
 import blobconverter
@@ -7,13 +8,15 @@ import depthai as dai
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
+SIZE = sys.argv[1] if len(sys.argv) > 1 else "512x288"
+NAME = sys.argv[2] if len(sys.argv) > 2 else "traffic_light"
 ir_folder = ROOT / "03_openvino_ir"
-blob_path = HERE / "traffic_light-512x288.blob"
+blob_path = HERE / f"{NAME}-{SIZE}.blob"
 
 blobconverter.set_defaults(silent=True)
 compiled = blobconverter.from_openvino(
-    xml=str(ir_folder / "traffic_light-512x288.xml"),
-    bin=str(ir_folder / "traffic_light-512x288.bin"),
+    xml=str(ir_folder / f"{NAME}-{SIZE}.xml"),
+    bin=str(ir_folder / f"{NAME}-{SIZE}.bin"),
     data_type="FP16",
     shaves=8,
     output_dir=str(HERE),

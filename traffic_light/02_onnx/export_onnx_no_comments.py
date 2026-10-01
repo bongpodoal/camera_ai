@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import types
+import sys
 from pathlib import Path
 
 import onnxruntime
@@ -9,10 +10,12 @@ from ultralytics import YOLO
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-pt_path = ROOT / "01_pytorch_pt" / "traffic_light.pt"
 
-WIDTH, HEIGHT = 512, 288
-onnx_path = HERE / f"traffic_light-{WIDTH}x{HEIGHT}.onnx"
+SIZE = sys.argv[1] if len(sys.argv) > 1 else "512x288"
+NAME = sys.argv[2] if len(sys.argv) > 2 else "traffic_light"
+WIDTH, HEIGHT = map(int, SIZE.split("x"))
+pt_path = ROOT / "01_pytorch_pt" / f"{NAME}.pt"
+onnx_path = HERE / f"{NAME}-{WIDTH}x{HEIGHT}.onnx"
 OUTPUT_NAMES = ["output1_yolov8", "output2_yolov8", "output3_yolov8"]
 
 network = YOLO(str(pt_path)).model.float().eval()

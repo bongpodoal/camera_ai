@@ -1,0 +1,29 @@
+{
+  "duration_s": 20.7,
+  "streams": {
+    "frame": {
+      "count": 378,
+      "interval_basis": "device",
+      "mean_interval_ms": 51.88,
+      "min_interval_ms": 33.3,
+      "max_interval_ms": 66.66,
+      "rate_hz": 19.27
+    },
+    "detections": {
+      "count": 378,
+      "interval_basis": "device",
+      "mean_interval_ms": 51.88,
+      "min_interval_ms": 33.3,
+      "max_interval_ms": 66.66,
+      "rate_hz": 19.27
+    },
+    "system": {
+      "count": 21,
+      "interval_basis": "host",
+      "mean_interval_ms": 990.82,
+      "min_interval_ms": 789.74,
+      "max_interval_ms": 1004.71,
+      "rate_hz": 1.01
+    }
+  }
+}

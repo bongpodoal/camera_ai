@@ -1,7 +1,7 @@
 # camera_ai — 작업 메모리 (다른 컴퓨터에서 이어서 작업하기 위한 파일)
 
 Claude Code는 이 파일을 자동으로 읽는다. 사람도 이 파일 하나로 맥락을 잡을 수 있게 쓴다.
-마지막 갱신: 2026-09-29.
+마지막 갱신: 2026-10-01.
 
 ## 1. 프로젝트가 무엇인가
 
@@ -37,6 +37,8 @@ OAK-D(Myriad X / RVC2) **공식 예제 모델(YOLOv6n)을 7단계로 나눠 분�
 | 최소 실행 | `minimal_example/` | `run_yolov6n.py`, `data_logger.py`, `image_saver.py` (+ `_no_comments`) | 5분 실측 완료 (21.4 FPS, 이미지 1500장) |
 | — | `../tools/` | `oakd_preview.py` | 카메라 연결 확인용 (AI 없음) |
 | — | `../tools/` | `latency_test.py` (+ `_no_comments`), `latency_runs/` | 지연 분해 측정 (엣지/PC/총). 3모델 10초 측정 완료 (2026-09-29) |
+| — | `../tools/` | `latency_latest.py` (+ `_no_comments`), `run_latest_3models.sh` | 카메라 5 fps · AI 입력 큐 크기 1 비차단 · 화면 창 끔 · 5분. **준비만 됨, 미측정** (2026-10-01) |
+| — | `../results/` | `README.md` + 모델별 CSV·JSON | 지금까지 실측 기록 모음 (이미지·영상은 git 제외, T7·카메라 PC 에 있음) |
 
 ①~④가 비어 있는 이유: Luxonis는 최종 NNArchive만 배포한다. 중간 파일은 `buildinfo.json`의 기록으로만 분석한다.
 
@@ -44,7 +46,31 @@ OAK-D(Myriad X / RVC2) **공식 예제 모델(YOLOv6n)을 7단계로 나눠 분�
 YOLOv8n 예제(T7 외장하드 `camera_ai/*/yolov8n/`, 실카메라 검증 19 FPS)와 같은 절차로 ①~⑦ 구성. 상세: `traffic_light/README.md`.
 ①~⑤ 실행·검증 완료(카메라 없이). ⑦ 실카메라 5분 실측 완료(2026-09-29, **9.75 FPS**, 지연 중앙 821 ms). 실제 신호등 인식률 미확인.
 
+**2026-10-01 추가:** ②~⑤ 스크립트가 `[크기 [이름]]` 인자를 받는다 (없으면 `512x288 traffic_light`).
+`416x416` 으로 11s 변환 완료 (원본 .pt 와 출력 일치 확인, NNArchive 는 T7 에만 — 공개 허락은 512x288 만).
+`00_train/train_yolo.py` = 학습 스크립트 (`~/camera/train_yolo.py` 를 옮겨 모델·크기·이름 인자화, 데이터셋 자동 다운로드).
+
+**T7 에만 있는 것:** YOLOv8n ①~⑤ 파이프라인 (`T7/camera_ai/0?_*/yolov8n/`, git 미추적). `latency_latest.py --model yolov8n` 은 T7 에서 실행해야 한다.
+
 ## 3. 다음 할 일 (우선순위)
+
+**A. 신호등 YOLO11n 재학습 (RTX 4080 PC, 2026-10-01 결정)** — 11s(21.4 GFLOPs, 칩 9.75 FPS)가 과도해서 n(6.5 GFLOPs)으로 비교.
+   공개된 YOLO11n 신호등 모델은 없음 (HuggingFace 검색: 빈 저장소·보행자용 v8n 뿐) → 같은 데이터로 재학습.
+```bash
+cd traffic_light
+pip install huggingface_hub                                  # 데이터셋 다운로드용 (최초 1회)
+python3 00_train/train_yolo.py                               # = train yolo11n.pt 960 traffic_light_11n (11s 와 같은 조건)
+python3 00_train/train_yolo.py val yolo11n.pt 960 traffic_light   # 기존 11s 같은 방식 평가 (01_pytorch_pt/traffic_light.pt 필요)
+python3 02_onnx/export_onnx.py 416x416 traffic_light_11n     # ③ convert_ir · ④ compile_blob · ⑤ make_nnarchive 도 같은 인자
+```
+   - 학습 끝나면 `01_pytorch_pt/traffic_light_11n.pt` 로 복사됨 (git 제외). 960·416 두 크기로 평가 출력.
+   - 비교할 것: 11s vs 11n mAP (특히 red·green), 칩 FPS·지연. **yellow 오검출 의심**: val yellow 20개뿐인데 5분 실측에서 yellow 1377개.
+   - 11s 원본(`traffic_light.pt`)은 비공개 → 4080 PC 에 없으면 맥 `~/camera/deploy/` 에서 복사 (`01_pytorch_pt/get_pt.py <경로>`).
+
+**B. 5 fps + 최신화 큐 지연 측정 (카메라 PC, 준비 완료)** — `T7/camera_ai/tools` 에서
+   `PYTHON=~/venvs/camera_ai/bin/python bash run_latest_3models.sh` (5분 × 3~4모델 ≈ 16~22분).
+   입력: YOLOv6n 512×384 그대로, YOLOv8n·신호등 416×416. 11n NNArchive 가 있으면 자동으로 함께 잰다.
+   예상 총 지연: v6n 70~110 · v8n 80~120 · 신호등 11s 130~200 ms (이전 378 / 426 / 826).
 
 0. **`traffic_light/` 인식 확인** — 5분 실측(FPS·안정성)은 끝남 (6절 표). 남은 순서:
    ② 모니터에 신호등 영상 띄워 칩 검출 확인 → ③ 실제 교차로(거리·가로형 신호등).
@@ -67,7 +93,8 @@ cd example/07_host_output && ./selftest.sh 20         # 카메라 없이 전체 
 cd .. && python3 05_nnarchive/fetch_example.py        # 예제 모델 받기 + superblob 복원 (git에 없음)
 ```
 
-git에 없는 것: `*.superblob`(용량), `**/runs/`(5분 기록 ≈ 1.2 GB), `traffic_light/` 의 `.onnx`·`.bin`·`.blob`(②~④로 재생성).
+git에 없는 것: `*.superblob`(용량), `**/runs/`(5분 기록 ≈ 1.2 GB), `traffic_light/` 의 `.onnx`·`.bin`·`.blob`(②~④로 재생성),
+`*.pt`(신호등 비공개), 512x288 외 신호등 `.tar.xz`, 학습 데이터셋, `results/` 의 이미지·영상.
 
 ## 5. 장치 연결 (가장 많이 막히는 곳)
 
@@ -127,6 +154,12 @@ nmcli connection up oak-poe && ping -c 2 169.254.1.222
 | YOLOv8n 예제 (T7 외장하드) | 19 | — | — | — |
 | 신호등 YOLO11s (`traffic_light`) | **9.75** (1초 구간 9.65~9.81) | 821 ms | 42.1 → 53.4°C | `traffic_light/07_host_output/runs/20260929_160337` |
 
+**지연 원인 (2026-10-01 정리):** 세 모델 모두 엣지 지연 ≈ 추론 간격 × 8 (7.7 / 7.8 / 7.9장) → 크기 고정 큐가 가득 찬 상태로 추정.
+같은 모델에서 AI > 카메라 FPS 면 57 ms, AI < 카메라면 358 ms. 문서: 8절 "OAK-D 지연 원인 정리".
+
+**맥북 M5 학습 속도 (2026-10-01 실측, PyTorch MPS):** YOLO11n 960 batch 8 = 16.5장/s (11s 7.4장/s) → 60 epoch ≈ 4~5.5시간.
+640 ≈ 2시간, 416 ≈ 1시간. 실제 학습은 순수 GPU 의 약 1.3배. → 학습은 CUDA PC 에서.
+
 **지연 분해 (2026-09-29, 두 번째 PC, 10초씩, 중앙값):** `tools/latency_test.py` → `tools/latency_runs/20260929/`
 
 | 모델 | FPS | 엣지 지연 | PC 지연 | 총 지연 | 엣지 비중 |
@@ -162,6 +195,7 @@ nmcli connection up oak-poe && ping -c 2 169.254.1.222
 | 엣지에 모델 올리기 과정과 원리 (6절은 삭제된 `edge_deploy.py` 기준이라 낡음) | https://claude.ai/code/artifact/df7e517a-23fa-474a-98a4-8df27fb247f7 |
 | Step 01 · 공식 예제 실험 기록 | https://claude.ai/code/artifact/423ed4dd-372a-4117-a5c5-747c2f02693d |
 | Step 02 · 신호등 모델 (현재 범위 밖) | https://claude.ai/code/artifact/fd012efe-cae1-4e01-92a8-c12cb81b2498 |
+| OAK-D 지연 원인 정리 (2026-10-01, Claude Docs) | https://claude.ai/code/artifact/068590d1-a285-4464-a2d8-89fc1c53dcfd |
 
 ## 9. 자주 쓰는 명령
 
@@ -181,4 +215,10 @@ python3 01_pytorch_pt/get_pt.py && python3 02_onnx/export_onnx.py       # ①②
 python3 03_openvino_ir/convert_ir.py && python3 04_blob/compile_blob.py # ③④ (인터넷)
 python3 05_nnarchive/make_nnarchive.py                                  # ⑤
 python3 07_host_output/run_with_logging.py --duration 60                # ⑥+기록 (카메라)
+python3 00_train/train_yolo.py [train|val|resume] [기본모델] [크기] [이름]  # ⓪ 학습 (CUDA GPU)
+python3 02_onnx/export_onnx.py 416x416 traffic_light_11n                # ②~⑤ 는 [크기 [이름]] 인자
+
+cd tools                                                                 # 지연 측정
+python3 latency_latest.py --model yolov6n|yolov8n|traffic_light|traffic_light_11n --out-dir latency_runs/x
+bash run_latest_3models.sh [fps=5] [초=300]
 ```

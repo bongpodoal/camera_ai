@@ -2,6 +2,7 @@
 
 import json
 import tarfile
+import sys
 from pathlib import Path
 
 import depthai as dai
@@ -10,10 +11,12 @@ from ultralytics import YOLO
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-pt_path = ROOT / "01_pytorch_pt" / "traffic_light.pt"
-onnx_path = ROOT / "02_onnx" / "traffic_light-512x288.onnx"
-blob_path = ROOT / "04_blob" / "traffic_light-512x288.blob"
-archive_path = HERE / "traffic_light-512x288.tar.xz"
+SIZE = sys.argv[1] if len(sys.argv) > 1 else "512x288"
+NAME = sys.argv[2] if len(sys.argv) > 2 else "traffic_light"
+pt_path = ROOT / "01_pytorch_pt" / f"{NAME}.pt"
+onnx_path = ROOT / "02_onnx" / f"{NAME}-{SIZE}.onnx"
+blob_path = ROOT / "04_blob" / f"{NAME}-{SIZE}.blob"
+archive_path = HERE / f"{NAME}-{SIZE}.tar.xz"
 
 
 def shape_of(tensor):

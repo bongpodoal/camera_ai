@@ -1,0 +1,17 @@
+=== full ===
+[2026-09-16 15:02:12.331] [depthai] [warning] An optional NETWORK bootloader update is available (installed: 0.0.28, available: 0.0.29). Updating is recommended to improve device discoverability. Run 'depthai --flash' or 'depthai-core/utilities/flash_network_bootloader.py', or see https://docs.luxonis.com/software-v3/depthai/depthai-components/bootloader for more information.
+[2026-09-16 15:02:59.257] [depthai] [error] Device with id 19443010C19B387E00 has crashed. Crash dump logs are stored in: /home/henes-ad/.cache/depthai/crashdumps/35d080679cdfc6fdbc79f04c504bc475dee6bc44/crash_dump_2026-09-16_15_02_59.tar.gz - please report to developers.
+[full] 워밍업 5.0s 제외
+  누적 FPS : 21.44  (643개 / 30.0s)
+  순간 FPS : 21.45  (최근 60개 구간)
+=== nodisplay ===
+[2026-09-16 15:03:12.335] [depthai] [warning] An optional NETWORK bootloader update is available (installed: 0.0.28, available: 0.0.29). Updating is recommended to improve device discoverability. Run 'depthai --flash' or 'depthai-core/utilities/flash_network_bootloader.py', or see https://docs.luxonis.com/software-v3/depthai/depthai-components/bootloader for more information.
+[nodisplay] 워밍업 5.0s 제외
+  누적 FPS : 21.42  (642개 / 30.0s)
+  순간 FPS : 21.38  (최근 60개 구간)
+=== detonly ===
+[2026-09-16 15:04:07.981] [depthai] [warning] An optional NETWORK bootloader update is available (installed: 0.0.28, available: 0.0.29). Updating is recommended to improve device discoverability. Run 'depthai --flash' or 'depthai-core/utilities/flash_network_bootloader.py', or see https://docs.luxonis.com/software-v3/depthai/depthai-components/bootloader for more information.
+[19443010C19B387E00] [169.254.1.222] [1789538667.164] [host] [warning] Monitor thread (device: 19443010C19B387E00 [169.254.1.222]) - ping was missed, closing the device connection
+[19443010C19B387E00] [169.254.1.222] [1789538669.165] [host] [warning] Closed connection
+[19443010C19B387E00] [169.254.1.222] [1789538669.165] [host] [warning] Attempting to reconnect. Timeout is 10000ms
+#13   Object "[0xffffffffffffffff]", at 0xffffffffffffffff, in 

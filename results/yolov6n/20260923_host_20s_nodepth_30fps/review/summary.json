@@ -1,0 +1,27 @@
+{
+  "frames": 603,
+  "duration_s": 19.979,
+  "seq_gaps": 0,
+  "detections": 861,
+  "by_class": {
+    "chair": 601,
+    "person": 240,
+    "clock": 20
+  },
+  "params_with_value": 77,
+  "params_total": 89,
+  "missing": [
+    "nearest_z_mm",
+    "x_mm",
+    "y_mm",
+    "z_mm",
+    "range_mm",
+    "bearing_deg",
+    "roi_x",
+    "roi_y",
+    "roi_w",
+    "roi_h",
+    "depth_lo_mm",
+    "depth_hi_mm"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "frames": 447,
+  "duration_s": 19.9722,
+  "seq_gaps": 153,
+  "detections": 865,
+  "by_class": {
+    "person": 425,
+    "chair": 333,
+    "tv": 107
+  },
+  "params_with_value": 89,
+  "params_total": 89,
+  "missing": []
+}

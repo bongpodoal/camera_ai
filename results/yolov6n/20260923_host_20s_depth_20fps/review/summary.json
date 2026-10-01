@@ -1,0 +1,15 @@
+{
+  "frames": 405,
+  "duration_s": 19.9923,
+  "seq_gaps": 0,
+  "detections": 744,
+  "by_class": {
+    "chair": 404,
+    "person": 336,
+    "microwave": 2,
+    "couch": 2
+  },
+  "params_with_value": 89,
+  "params_total": 89,
+  "missing": []
+}

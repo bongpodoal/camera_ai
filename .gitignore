@@ -7,3 +7,14 @@ __pycache__/
 traffic_light/02_onnx/*.onnx
 traffic_light/03_openvino_ir/*.bin
 traffic_light/04_blob/*.blob
+# results — 이미지·영상은 용량이 커서 git 제외 (CSV·JSON·README 만 추적)
+results/**/images/
+results/**/frames/
+results/**/*.mp4
+# 원본 가중치 — 신호등은 비공개(사용자 결정), 예제는 용량. ① 스크립트·00_train 으로 다시 만든다
+traffic_light/01_pytorch_pt/*.pt
+example/01_pytorch_pt/**/*.pt
+# 학습 데이터셋 (1.1 GB, 00_train/train_yolo.py 가 내려받음)
+traffic_light/00_train/datasets/
+# 신호등 NNArchive 는 traffic_light-512x288.tar.xz 만 공개 허락 (이미 추적 중) — 나머지는 ②~⑤ 로 다시 만든다
+traffic_light/05_nnarchive/*.tar.xz

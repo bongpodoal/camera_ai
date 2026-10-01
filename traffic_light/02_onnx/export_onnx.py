@@ -16,11 +16,12 @@
 #   이 모델은 960 에서 학습했다(멀리 있는 작은 신호등을 잡으려고). 512 로 줄이면 먼 신호등은 놓치기 쉽지만,
 #   yolo11s 는 yolov8n 보다 계산이 약 3배라 칩 속도(5 fps 이상)를 먼저 확보하려고 예제와 같은 크기로 시작한다.
 #
-# 실행:  python3 02_onnx/export_onnx.py
-# 결과:  02_onnx/traffic_light-512x288.onnx
+# 실행:  python3 02_onnx/export_onnx.py  [크기 [이름]]   예) 416x416 traffic_light_11n (없으면 512x288 traffic_light)
+# 결과:  02_onnx/<이름>-<크기>.onnx
 # ============================================================================
 
 import types                        # 출력 층의 forward 함수를 바꿔 끼우려고
+import sys                          # 실행 인자(입력 크기·모델 이름) 읽기
 from pathlib import Path
 
 import onnxruntime                  # 만든 ONNX 파일이 제대로 읽히는지 확인하려고
@@ -29,11 +30,15 @@ from ultralytics import YOLO
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent                                      # traffic_light 폴더
-pt_path = ROOT / "01_pytorch_pt" / "traffic_light.pt"
 
 # 입력 크기. 카메라 화면이 16:9 라서 512×288 로 정했다 (YOLO는 32의 배수여야 함).
-WIDTH, HEIGHT = 512, 288
-onnx_path = HERE / f"traffic_light-{WIDTH}x{HEIGHT}.onnx"
+# 실행 인자로 바꿀 수 있다. 예) 416x416 (2026-10-01 지연 비교용). 인자가 없으면 512x288.
+SIZE = sys.argv[1] if len(sys.argv) > 1 else "512x288"
+# 모델 이름 = 01_pytorch_pt/<이름>.pt 와 결과 파일 이름. 예) traffic_light_11n. 인자가 없으면 traffic_light (YOLO11s).
+NAME = sys.argv[2] if len(sys.argv) > 2 else "traffic_light"
+WIDTH, HEIGHT = map(int, SIZE.split("x"))
+pt_path = ROOT / "01_pytorch_pt" / f"{NAME}.pt"
+onnx_path = HERE / f"{NAME}-{WIDTH}x{HEIGHT}.onnx"
 OUTPUT_NAMES = ["output1_yolov8", "output2_yolov8", "output3_yolov8"]   # ⑤ config.json 에 같은 이름을 쓴다
 
 network = YOLO(str(pt_path)).model.float().eval()       # eval() = 학습 모드 끄기
