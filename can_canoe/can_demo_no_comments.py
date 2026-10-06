@@ -9,7 +9,7 @@ from pathlib import Path
 
 import can
 
-from can_msgs import BITS_PER_FRAME, MODEL_IDS, det_box, frame_status, perf, set_fd_frames
+from can_msgs import BITS_PER_FRAME, MODEL_IDS, det_box, frame_status, open_bus, perf, set_fd_frames
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVES = {
@@ -152,7 +152,7 @@ def main(argv=None):
         kw.update(fd=True, data_bitrate=a.data_bitrate)
     set_fd_frames(a.fd_frames)
     channel = int(a.channel) if a.channel.isdigit() else a.channel
-    bus = can.Bus(interface=a.interface, channel=channel, **kw)
+    bus = open_bus(a.interface, channel, **kw)
     source = FakeSource(a) if a.fake else OakSource(a)
     stop = threading.Event()
 

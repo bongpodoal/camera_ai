@@ -55,3 +55,21 @@ def perf(pc_ms, post_ms, eth_kbps, can_load_pct, dropped_total):
 def decode(msg):
     m = DB.get_message_by_frame_id(msg.arbitration_id)
     return m.name, m.decode(msg.data, decode_choices=False)
+
+
+def open_bus(interface, channel, **kw):
+    """can.Bus 열기. Kvaser Leaf v3 는 python-can 이 여는 LOCAL_TXACK 설정을 지원하지 않아
+    (canIoCtl Error -1) 그 에러만 무시하고 연다 (이번 용도엔 필요 없는 설정)."""
+    if interface == "kvaser":
+        from can.interfaces.kvaser import canlib, canstat
+        orig = canlib.canIoCtlInit
+
+        def tolerant(handle, func, buf, size):
+            try:
+                return orig(handle, func, buf, size)
+            except Exception:
+                if func == canstat.canIOCTL_SET_LOCAL_TXACK:
+                    return 0
+                raise
+        canlib.canIoCtlInit = tolerant
+    return can.Bus(interface=interface, channel=channel, **kw)

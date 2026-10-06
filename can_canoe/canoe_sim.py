@@ -11,6 +11,8 @@ import time
 
 import can
 
+from can_msgs import open_bus
+
 
 class CanoeSim:
     def __init__(self, bus, out_path):
@@ -38,7 +40,7 @@ if __name__ == "__main__":
     if a.app_name:
         kw["app_name"] = a.app_name
     channel = int(a.channel) if a.channel.isdigit() else a.channel
-    sim = CanoeSim(can.Bus(interface=a.interface, channel=channel, **kw), a.out)
+    sim = CanoeSim(open_bus(a.interface, channel, **kw), a.out)
     try:
         while True:
             time.sleep(1)

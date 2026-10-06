@@ -38,6 +38,8 @@ OAK-D --이더넷--> 카메라 PC (can_demo.py) --CAN 500 kbps--> CANoe PC (받�
 4. Trace 창에 FRAME_STATUS 등이 이름·값으로 보이는지 확인한다.
 5. Logging 블록을 켜고 저장 형식을 `.asc` (또는 `.blf`) 로 한다. **측정 시작 → run_matrix.sh 실행 → 끝나면 측정 중지** 순서.
 
+> **2026-10-06 결정: 클래식 CAN 500 kbps 로 낮춤** (카메라 PC 의 Kvaser Leaf v3 의 FD 지원 불확실). CANoe 에는 `oakd_canoe.dbc` (FD 아님), 채널은 클래식 500 kbps. 아래 FD 내용은 참고용.
+
 ## 확정 구조 (2026-10-06): 카메라 PC → CAN FD → Windows 노트북 (Vector VN1630A + CANoe)
 ```
 OAK-D ─이더넷→ Ubuntu 22.04.5 (can_demo.py) ─ FD 어댑터 ──CAN_H/CAN_L, 양 끝 120 Ω── Vector VN1630A ─ Windows 노트북 (CANoe 로깅)
@@ -73,15 +75,16 @@ python canoe_sim.py --interface vector --channel 0 --fd --data-bitrate 2000000 -
 | FD 64바이트 활용 | 한 프레임에 박스 여러 개 묶기 — 구현 안 함 |
 | 실장비 시험 | 모든 CAN 경로가 맥의 가상 버스에서만 확인됨 |
 
-## 카메라 PC 쪽
+## 카메라 PC 쪽 (Kvaser Leaf v3: `INTERFACE=kvaser CHANNEL=0`, 드라이버 설치는 PROGRESS.md 2026-10-06 추가 4)
+Windows 노트북 절차는 `WINDOWS_SETUP.md`.
 ```bash
-sudo ip link set can0 up type can bitrate 500000 sample-point 0.8 dbitrate 2000000 dsample-point 0.8 fd on   # FD (클래식이면 'bitrate 500000' 만, 이때 run_matrix.sh 는 FD=0)
+sudo ip link set can0 up type can bitrate 500000        # 클래식 (기본). FD 면: ... bitrate 500000 sample-point 0.8 dbitrate 2000000 dsample-point 0.8 fd on
 cd can_canoe
 NIC=<이더넷이름> V8_ARCHIVE=<T7의 yolov8n NNArchive> bash run_matrix.sh
 # CANoe 로그를 가져온 뒤
 python3 analyze.py --log canoe.asc --runs-root runs/<날짜_시각>
 ```
-run_matrix.sh 는 기본이 CAN FD (FD=1, FD_FRAMES=1) 다. 클래식으로 하려면 `FD=0 FD_FRAMES=0`.
+run_matrix.sh 는 기본이 **클래식 CAN 500 kbps** (FD=0, FD_FRAMES=0, 2026-10-06 변경) 다. CAN FD 로 하려면 `FD=1 FD_FRAMES=1`.
 
 ## 시간축이 이렇게 정해진다
 | 값 | 무엇의 시계 | 용도 |

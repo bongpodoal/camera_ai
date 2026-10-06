@@ -26,7 +26,7 @@ from pathlib import Path
 
 import can
 
-from can_msgs import BITS_PER_FRAME, MODEL_IDS, det_box, frame_status, perf, set_fd_frames
+from can_msgs import BITS_PER_FRAME, MODEL_IDS, det_box, frame_status, open_bus, perf, set_fd_frames
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVES = {      # latency_latest.py 와 같은 모델 (yolov6n 은 공식 예제 이름)
@@ -181,7 +181,7 @@ def main(argv=None):
         kw.update(fd=True, data_bitrate=a.data_bitrate)
     set_fd_frames(a.fd_frames)
     channel = int(a.channel) if a.channel.isdigit() else a.channel       # vector 는 채널 번호가 정수
-    bus = can.Bus(interface=a.interface, channel=channel, **kw)
+    bus = open_bus(a.interface, channel, **kw)
     source = FakeSource(a) if a.fake else OakSource(a)
     stop = threading.Event()
 

@@ -62,6 +62,8 @@ YOLOv8n 예제(T7 외장하드 `camera_ai/*/yolov8n/`, 실카메라 검증 19 FP
    - 설정은 5 fps 고정 + AI 입력 큐 크기 1 비차단 (`tools/latency_latest.py` 와 같음).
    - 다음: 카메라 PC 에서 `vcan0` + `canoe_sim.py` 로 1단계 확인 → 실제 CAN → `run_matrix.sh` → CANoe 로그로 `analyze.py`. 상세는 `can_canoe/README.md`, 기록은 `PROGRESS.md` 2026-10-06.
    - **2026-10-06 확정 구조:** 카메라 PC(Ubuntu 22.04.5) → **CAN FD** → **Windows 노트북(Vector VN1630A + CANoe 19)** 로깅. Vector 드라이버·python-can `vector` 는 Windows 전용이라 Vector 는 노트북 쪽. 카메라 PC 는 socketcan FD 어댑터로 송신 (**모델 미확인**, 예: PCAN-USB FD).
+   - **Windows 쪽은 `can_canoe/WINDOWS_SETUP.md` 하나로 진행** (git pull 후). Ubuntu 송신은 `INTERFACE=kvaser CHANNEL=0`. Kvaser Leaf v3 는 python-can 이 여는 TXACK 설정을 거부해서 `can_msgs.open_bus()` 가 그 에러만 무시하고 연다.
+   - **2026-10-06 결정: 클래식 CAN 500 kbps 로 낮춤** (`run_matrix.sh` 기본 FD=0, CANoe 엔 `oakd_canoe.dbc`, 채널 클래식). 아래 FD 항목은 FD 를 다시 쓸 때만.
    - CAN FD 설정: 중재 500 kbps · 데이터 2 Mbps · 샘플 포인트 80%, 양쪽 동일. 메시지는 `--fd --fd-frames` (run_matrix.sh 기본값), CANoe 에는 `oakd_canoe_fd.dbc`. VN1630A 의 FD 지원은 데이터시트로 최종 확인 필요. 64바이트 활용(박스 묶기)은 미구현. 클래식으로 낮추려면 `FD=0 FD_FRAMES=0` + `oakd_canoe.dbc`.
    - CANoe 가 막힐 때 대안(미검증): 노트북에서 `canoe_sim.py --interface vector --channel 0 --fd --out canoe.asc` (Python + Vector 드라이버만).
    - 순서: ① Windows CANoe 측정 시작(FD 500k/2M, `oakd_canoe_fd.dbc` 추가, Logging .asc) ② 카메라 PC `ip link set can0 up type can bitrate 500000 sample-point 0.8 dbitrate 2000000 dsample-point 0.8 fd on` ③ `can_demo.py --fake --fd --fd-frames` 로 Trace 확인 ④ 실제 카메라 1모델 60초 ⑤ `run_matrix.sh` ⑥ 로그를 옮겨 `analyze.py`. **실제 CANoe 가 만든 .asc 를 analyze.py 가 읽는지 미확인** (안 읽히면 analyze.py 의 read_log 를 로그 형식에 맞출 것).
@@ -70,9 +72,9 @@ YOLOv8n 예제(T7 외장하드 `camera_ai/*/yolov8n/`, 실카메라 검증 19 FP
 
 | # | 작업 | 어디서 | 상태 |
 |---|---|---|---|
-| 1 | CAN 과제 1단계: `vcan0` + `canoe_sim.py` 로 실카메라 경로 확인 (특히 `--raw off` 칩 Script) | 카메라 PC | 미착수 |
-| 2 | **카메라 PC 의 socketcan FD 어댑터 모델** 확인·준비 (이 PC 엔 `can0` 없음, 2026-10-06 확인). Vector 는 VN1630A (Windows 노트북, COM2) 로 확인됨, VN1630A 의 FD 지원은 데이터시트 확인 | 사용자 확인 | 어댑터 미확인 |
-| 3 | 노트북 CANoe 설정(FD 500k/2M, `oakd_canoe_fd.dbc`, .asc 로깅) → `can_demo.py --fake --fd --fd-frames` 로 Trace 확인 → 카메라 1모델 60초 → `run_matrix.sh` 6회 실측(기본 FD) → `analyze.py` (실제 .asc 읽기 미확인, 안 되면 `read_log` 수정) | 카메라 PC + Windows 노트북 | 미착수 |
+| 1 | CAN 과제 1단계: Ubuntu 에서 `--interface kvaser --channel 0` 으로 `can_demo.py --fake` 송신 → Windows CANoe Trace 확인 (Kvaser 가상 채널 1↔2 로 송수신 시험은 통과) | 카메라 PC + Windows 노트북 | 배선·CANoe 설정 대기 |
+| 2 | ~~어댑터 드라이버~~ **해결 (2026-10-06):** Kvaser LinuxCAN 5.52 설치 (gcc-12 + `sudo make install`), `listChannels` 에서 Leaf v3 = ch0 확인. 커널 socketcan 은 이 ID(`0117`) 미지원이라 `can0` 없음 → `kvaser` 인터페이스 사용 | — | 완료 |
+| 3 | **Windows 노트북 설정** — `can_canoe/WINDOWS_SETUP.md` 순서대로 (VN1630A 채널 할당, 클래식 500k, `oakd_canoe.dbc`, .asc 로깅, 측정 시작) → 카메라 1모델 60초 → `INTERFACE=kvaser CHANNEL=0 bash run_matrix.sh` 6회 → `analyze.py` (실제 .asc 읽기 미확인) | Windows 노트북 + 카메라 PC | **지금 단계** |
 | 4 | 5 fps 최신화 큐 5분 지연 측정 (`run_latest_3models.sh`) | 카메라 PC | 준비 완료 |
 | 5 | 신호등 YOLO11n 재학습 (아래 A) | RTX 4080 PC | 미착수 |
 | 6 | 인식률(정답 비교) 테스트 | — | 보류, 나중에 논의 |

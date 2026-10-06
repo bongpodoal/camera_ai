@@ -89,3 +89,24 @@ CAN으로 받을 수 있는지 확인하고, 파라미터 50개 이상을 추출
 | FD 설정 | 500 kbps / 2 Mbps / 샘플 포인트 80%. `run_matrix.sh` 기본이 FD, DBC 는 `oakd_canoe_fd.dbc` |
 | 코드 | vector 채널 번호(정수) 처리, `canoe_sim.py --app-name`. 맥 selftest 통과 (가상 버스) |
 | 미확인 | 카메라 PC 의 FD 어댑터 모델, VN1630A 의 FD 지원(데이터시트), 실제 CANoe 로그 읽기, 실제 카메라 경로 |
+
+## 2026-10-06 (추가 3) — 클래식 CAN 으로 낮춤
+
+| 항목 | 내용 |
+|---|---|
+| 변경 | `run_matrix.sh` 기본 FD=0 · FD_FRAMES=0 (클래식 500 kbps), CANoe 는 `oakd_canoe.dbc` |
+| 이유 | 카메라 PC 어댑터 Kvaser Leaf v3 의 FD 지원 불확실 |
+| 막힘 | 이 PC 에서 Leaf v3 가 `can0` 로 안 잡힘 (커널 kvaser_usb 가 ID 0117 미지원) → LinuxCAN 드라이버 또는 다른 어댑터 |
+| 준비됨 | Python 환경, 카메라 ping, 모델 3개 (T7 원본과 동일) |
+
+## 2026-10-06 (추가 4) — Kvaser 드라이버 설치, Windows 인계
+
+| 항목 | 내용 |
+|---|---|
+| 문제 | Leaf v3 (USB `0bfd:0117`) 를 커널 `kvaser_usb` 가 지원 안 해 `can0` 없음 |
+| 설치 | Kvaser LinuxCAN 5.52 (`linuxcan_5_52_563`) — gcc-12 필요(`sudo apt install gcc-12`), `make` → `sudo make install` → `sudo make load`. 비밀번호 없으면 불가 |
+| 확인 | `listChannels`: ch0 = Kvaser Leaf v3 (s/n 17930), ch1·2 = Kvaser Virtual CAN. `/usr/lib/libcanlib.so` |
+| 코드 | python-can `kvaser` 가 Leaf v3 에서 `canIoCtl LOCAL_TXACK` 에러 → `can_msgs.open_bus()` 로 무시 (`can_demo`, `canoe_sim` 적용) |
+| 시험 | 가상 채널 ch1 송신(`can_demo --fake`) → ch2 수신(`canoe_sim`) 10초: 송신 137 · 수신 130 프레임, 에러 0. 실제 버스(VN1630A) 는 미확인 |
+| Windows | `can_canoe/WINDOWS_SETUP.md` 신규. 클래식 500 kbps · `oakd_canoe.dbc` |
+| 다음 | Windows CANoe 설정 + 배선 → `--fake` Trace 확인 → 실카메라 1모델 → `run_matrix.sh` 6회 |
