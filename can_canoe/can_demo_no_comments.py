@@ -16,6 +16,7 @@ ARCHIVES = {
     "yolov8n": "05_nnarchive/yolov8n/yolov8n-416x416.tar.xz",
     "traffic_light": "traffic_light/05_nnarchive/traffic_light-416x416.tar.xz",
     "traffic_light_11n": "traffic_light/05_nnarchive/traffic_light_11n-416x416.tar.xz",
+    "traffic_light_v8n": "traffic_light/05_nnarchive/traffic_light_v8n-416x416.tar.xz",
 }
 EDGE_SCRIPT = """
 while True:

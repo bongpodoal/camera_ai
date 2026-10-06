@@ -93,6 +93,9 @@ run_matrix.sh 는 기본이 **클래식 CAN 500 kbps** (FD=0, FD_FRAMES=0, 2026-
 - `--duration` 은 **첫 프레임이 온 뒤부터** 잰다. 카메라가 켜지는 시간(약 12~16초)은 `summary.csv` 의 `startup_s` 로 따로 기록 (`fps_avg`·`eth_MBps` 도 첫 프레임부터).
 - 칩 지연값(EdgeMs)이 프레임보다 약 20 ms 늦게 오는 프레임이 10~18% 있다. 기본은 **기다리지 않고** 보내서(`--edge-wait 0`) 그 프레임의 EdgeMs 는 0 = **값 없음**(분석에서 제외, `frames.csv` 의 `edge_ms` 에는 값이 다 있음). `--edge-wait 0.25` 로 기다리면 EdgeMs 는 채워지지만 그 프레임 송신이 늦어 수신 간격 표준편차가 0.4 → 약 10 ms 로 커진다 (2026-10-06 A/B 측정).
 
+## 비교 모델 (2026-10-07 변경)
+`run_matrix.sh` 의 3모델 = **yolov6n**(COCO) · **traffic_light_v8n**(바탕화면 `last.pt`, YOLOv8n 신호등, red·green 2클래스) · **traffic_light**(YOLO11s, 4클래스). 기존 yolov8n(COCO) 자리를 `traffic_light_v8n`(ModelId 4)이 대신한다. 모델 파일은 `traffic_light/05_nnarchive/traffic_light_v8n-416x416.tar.xz` (git 제외, 이 PC 에서 `traffic_light/` ②~⑤ 로 만듦). Windows 로거는 `git pull` 로 `can_msgs.py` 의 ModelId 4 이름만 받으면 된다.
+
 ## PERF 는 별도 타이머로 정확히 1초마다 (2026-10-06)
 - `can_demo.py` 의 PERF(0x320)는 프레임 도착과 상관없는 **별도 타이머 스레드**가, 첫 프레임 기준 **k초 + 50 ms (k=1,2,3…)** 에 보낸다 (이전에는 프레임이 올 때만 확인해서 약 1.2초 간격, 시각도 883·2081 ms 처럼 어긋남). 가상 채널 시험: 수신 시각 1.05·2.05·3.05… 초, 간격 1000 ms.
 - +50 ms 는 수신 쪽에서 소수점을 버려 정수 초로 만들어도 k 로 안정적으로 떨어지게 하는 여유다.

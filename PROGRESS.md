@@ -170,3 +170,15 @@ CAN으로 받을 수 있는지 확인하고, 파라미터 50개 이상을 추출
 | 수정 | `can_demo.py`(+`_no_comments`): 타이머 스레드가 첫 프레임 기준 k초+50 ms 에 정확히 1초 간격 송신. 메인 루프와 공유하는 값·CAN 송신은 RLock 으로 보호 |
 | 검증 | Kvaser 가상 채널 fake 12초: PERF 수신 1.05~11.05초, 간격 1000 ms 11개, 내림하면 1~11. selftest 통과 |
 | 기록 | `PERF.csv` 시간 열을 ms 대신 정수 초(소수점 버림, `t_axis_s`)로 — Windows 로거 수정 요청 |
+
+## 2026-10-07 (추가 11) — 2번째 모델을 YOLOv8n(COCO) → 바탕화면 `last.pt`(신호등 YOLOv8n)로 교체
+
+| 항목 | 내용 |
+|---|---|
+| 요청 | 3모델 비교의 yolov8n 자리를 바탕화면의 `lask.pt` 로 (실제 파일명 `~/Desktop/last.pt`, 오타로 판단) |
+| 모델 정보 (체크포인트) | YOLOv8n detect, 파라미터 3.0 M, **클래스 2개 (red·green)**, 640 학습, epoch 39(40 epochs), 학습일 2026-07-29, 데이터 `dataset_fixed_v2`. `01_pytorch_pt/traffic_light_v8n.pt` 와 바이트 동일 (git 제외) |
+| 변환 (traffic_light/ ②~⑤, 416×416) | ② ONNX 출력 `[1,7,52,52]·[1,7,26,26]·[1,7,13,13]` (7 = 박스 4 + 신뢰도 1 + 클래스 2) → ③ IR(6.0 MB) → ④ blob(SHAVE 8, 6.1 MB) → ⑤ NNArchive 5.5 MB, depthai 에서 열림 (입력 416×416, 클래스 red·green). 이름 `traffic_light_v8n` |
+| 환경 | 이 PC 에 `~/venvs/tl_convert` (시스템 패키지 + depthai 3.10 + onnx · onnxruntime · blobconverter · matplotlib) 신규. 시스템 matplotlib 이 numpy 2 와 충돌해 venv 안에 따로 설치 |
+| 코드 | `can_msgs.MODEL_IDS` 에 `traffic_light_v8n: 4`, DBC ModelId 설명 `4=traffic_light_v8n`, `can_demo`(ARCHIVES), `analyze`(라벨 red·green), `run_matrix.sh` 모델 목록 = yolov6n · traffic_light_v8n · traffic_light (yolov8n 제거, `V8_ARCHIVE` 삭제) |
+| 시험 | 실카메라 20초 (가상 CAN): 5 fps, 엣지 지연 80.3 ms (yolov6n 69.5), 검출 0개 (장면에 신호등 없음, 정상). 실제 신호등 인식은 미확인 |
+| 공개 | 가중치·NNArchive 는 git 에 올리지 않음 (사용자가 공개 여부 결정) |

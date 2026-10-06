@@ -6,7 +6,7 @@
 #
 # 환경변수:  PYTHON(기본 python3)  INTERFACE(기본 socketcan)  CHANNEL(기본 can0)  NIC(이더넷 이름, 예 enp5s0)
 #            FD(기본 0 = 클래식 CAN, FD 는 FD=1)  DATA_BITRATE(기본 2000000)  FD_FRAMES(기본 0, FD=1 일 때 메시지도 FD 프레임으로: FD_FRAMES=1)
-#            DURATION(초, 기본 300)  FPS(기본 5)  V8_ARCHIVE(T7 의 yolov8n NNArchive 경로)
+#            DURATION(초, 기본 300)  FPS(기본 5)
 set -u
 cd "$(dirname "$0")"
 PYTHON=${PYTHON:-python3}; INTERFACE=${INTERFACE:-socketcan}; CHANNEL=${CHANNEL:-can0}
@@ -14,14 +14,13 @@ DURATION=${DURATION:-300}; FPS=${FPS:-5}; NIC=${NIC:-}
 OUT=runs/$(date +%Y%m%d_%H%M%S)
 mkdir -p "$OUT"
 i=0
-for model in yolov6n yolov8n traffic_light; do
+for model in yolov6n traffic_light_v8n traffic_light; do
   for raw in off on; do
     i=$((i+1))
     extra=()
     [ "${FD:-0}" = 1 ] && extra+=(--fd --data-bitrate "${DATA_BITRATE:-2000000}")
     [ "${FD_FRAMES:-0}" = 1 ] && extra+=(--fd-frames)
     [ -n "$NIC" ] && extra+=(--nic "$NIC")
-    [ "$model" = yolov8n ] && [ -n "${V8_ARCHIVE:-}" ] && extra+=(--archive "$V8_ARCHIVE")
     echo "=== $i/6  $model  raw $raw  (${DURATION}s) ==="
     "$PYTHON" can_demo.py --model "$model" --raw "$raw" --fps "$FPS" --duration "$DURATION" \
         --interface "$INTERFACE" --channel "$CHANNEL" "${extra[@]}" --out-dir "$OUT/${i}_${model}_${raw}"

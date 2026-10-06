@@ -70,6 +70,8 @@ YOLOv8n 예제(T7 외장하드 `camera_ai/*/yolov8n/`, 실카메라 검증 19 FP
    - CANoe 가 막힐 때 대안(미검증): 노트북에서 `canoe_sim.py --interface vector --channel 0 --fd --out canoe.asc` (Python + Vector 드라이버만).
    - 순서: ① Windows CANoe 측정 시작(FD 500k/2M, `oakd_canoe_fd.dbc` 추가, Logging .asc) ② 카메라 PC `ip link set can0 up type can bitrate 500000 sample-point 0.8 dbitrate 2000000 dsample-point 0.8 fd on` ③ `can_demo.py --fake --fd --fd-frames` 로 Trace 확인 ④ 실제 카메라 1모델 60초 ⑤ `run_matrix.sh` ⑥ 로그를 옮겨 `analyze.py`. **실제 CANoe 가 만든 .asc 를 analyze.py 가 읽는지 미확인** (안 읽히면 analyze.py 의 read_log 를 로그 형식에 맞출 것).
 
+   - **2026-10-07 모델 변경:** CAN 비교 3모델 = yolov6n · **traffic_light_v8n (바탕화면 `last.pt`, YOLOv8n 신호등 red·green, ModelId 4)** · traffic_light(11s). yolov8n(COCO) 제외. NNArchive 는 이 PC 의 `traffic_light/05_nnarchive/` (git 제외), 변환 환경 `~/venvs/tl_convert`. 상세 `PROGRESS.md` 추가 11.
+
 **현재 해야 할 일 요약 (2026-10-06 갱신, 순서대로):**
 
 | # | 작업 | 어디서 | 상태 |

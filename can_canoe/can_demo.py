@@ -33,6 +33,7 @@ ARCHIVES = {      # latency_latest.py 와 같은 모델 (yolov6n 은 공식 예�
     "yolov8n": "05_nnarchive/yolov8n/yolov8n-416x416.tar.xz",
     "traffic_light": "traffic_light/05_nnarchive/traffic_light-416x416.tar.xz",
     "traffic_light_11n": "traffic_light/05_nnarchive/traffic_light_11n-416x416.tar.xz",
+    "traffic_light_v8n": "traffic_light/05_nnarchive/traffic_light_v8n-416x416.tar.xz",
 }
 # 칩 위 코드 ① 엣지 지연 재기 (칩 시계끼리 뺀다. getTimestamp() 는 펌웨어 크래시라 쓰지 않는다)
 EDGE_SCRIPT = """

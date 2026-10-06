@@ -53,7 +53,7 @@ CM_ SG_ 768 Seq "Camera frame sequence number modulo 65536.";
 CM_ SG_ 768 Fps "Chip processing rate over the last second.";
 CM_ SG_ 768 EdgeMs "Latency inside the camera chip (chip clock minus chip clock, no drift). Not a time axis. 0 = no value (the chip latency had not arrived).";
 CM_ SG_ 768 SeqGap "Frames skipped since the previous message, saturates at 15.";
-CM_ SG_ 768 ModelId "0=yolov6n 1=yolov8n 2=traffic_light 3=traffic_light_11n";
+CM_ SG_ 768 ModelId "0=yolov6n 1=yolov8n 2=traffic_light 3=traffic_light_11n 4=traffic_light_v8n";
 CM_ SG_ 768 RawOn "0=only detection results are received, 1=raw image is also received over Ethernet";
 CM_ SG_ 784 SeqLo "Low 4 bits of FRAME_STATUS.Seq.";
 CM_ SG_ 784 Label "Class number. traffic_light models: 0=red 1=yellow 2=green 3=off. COCO models: COCO class index.";

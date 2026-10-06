@@ -12,7 +12,7 @@ HERE = Path(__file__).resolve().parent
 DB = cantools.database.load_file(str(HERE / "oakd_canoe.dbc"))
 MSG = {m.name: m for m in DB.messages}
 ID_FRAME, ID_DET, ID_PERF = (MSG[n].frame_id for n in ("FRAME_STATUS", "DET_BOX", "PERF"))
-MODEL_IDS = {"yolov6n": 0, "yolov8n": 1, "traffic_light": 2, "traffic_light_11n": 3}
+MODEL_IDS = {"yolov6n": 0, "yolov8n": 1, "traffic_light": 2, "traffic_light_11n": 3, "traffic_light_v8n": 4}
 MODEL_NAMES = {v: k for k, v in MODEL_IDS.items()}
 BITS_PER_FRAME = 135        # 11비트 ID + 8바이트 데이터, 비트 스터핑 최악 근사
 
