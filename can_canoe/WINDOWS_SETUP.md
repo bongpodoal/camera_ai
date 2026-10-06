@@ -40,10 +40,11 @@ python canoe_logger.py --idle-exit 120        # 프레임이 120초 끊기면 �
 | 결과 (`can_logs\<날짜_시각>\`) | 내용 |
 |---|---|
 | `canoe.asc` | 받은 프레임 원본 (시간축 = VN1630A 가 받은 시각, 첫 프레임 0) |
-| `FRAME_STATUS.csv` · `DET_BOX.csv` · `PERF.csv` | 메시지별 값 + 실행 번호 + `t_axis_ms`(정수) |
+| `FRAME_STATUS.csv` · `DET_BOX.csv` · `PERF.csv` | 메시지별 값 + 실행 번호 + 시간열. FRAME_STATUS·DET_BOX 는 `t_axis_ms`(정수 ms), **PERF 는 `t_axis_s`(첫 프레임 기준 소수점 버림 정수 초)**. PERF 에는 그 초의 마지막 완결 프레임 값(`frame_seq`·`edge_ms`·`det_count`·`box_*`)이 같이 붙음 |
 | `runs_summary.csv` / `.md` | 실행(모델 × Raw)별 수신 프레임·결번(`seq_missing`)·FPS·간격 표준편차·엣지 지연·PC/박스 시간·이더넷·CAN 부하·박스 수 수신/기대·검출 비율·평균 신뢰도·클래스별 개수 |
 | `meta.json` | 로거·python-can 버전·채널·비트레이트, **타임스탬프 출처**, 첫 프레임 절대 시각(ISO ms)·`rx_duration_s`·로거 시작→첫 프레임 초, 항목 정의(`definitions`) |
 
+결번 구분: `seq_missing`(Seq 건너뜀 총수) = `cam_dropped_seqgap`(카메라가 버렸다고 `SeqGap` 으로 알린 수) + `can_lost_frames`(진짜 CAN 결번, 0 이어야 정상). 박스 기대값은 `sum(min(DetCount, 8))` (DET_BOX 는 프레임당 최대 8개만 전송, 칩 검출 합은 `det_count_sum`, 8개 초과 프레임 수는 `frames_det_over8`).
 요약표 통계 규칙: `edge_ms` 는 `EdgeMs=0`(값 없음) 제외, `pc_ms`·`post_ms`·`eth_KBps` 는 첫 PERF(워밍업) 제외, `interval_ms_*_skip2` 는 첫 2프레임 이후, `fps_10s` 는 꽉 찬 10초 구간별, ID 별 개수 `n_0x300/310/320`, `gap_before_s`·`t_start_wall_iso` 로 실행 간 시간 잇기. 드리프트(ppm)는 **5분(300초) 이상** 실행이 필요하고 30초 시험은 연결 확인용.
 
 ## 4. 시험 (Ubuntu 쪽은 Ubuntu 의 Claude/사용자가 진행)

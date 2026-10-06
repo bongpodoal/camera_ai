@@ -7,7 +7,8 @@ r"""과제용 CAN 수신 로거 (Windows 노트북 + Vector VN1630A). CANoe Logg
 하는 일
     1) 받은 프레임을 canoe.asc 에 그대로 저장한다 (1초마다 디스크에 반영 → 강제 종료해도 거의 안 잃음)
     2) 끝나면 canoe.asc 에서 아래를 만든다 (--summarize 로 나중에 다시 만들 수도 있다)
-         FRAME_STATUS.csv / DET_BOX.csv / PERF.csv   메시지별 값 + 실행 번호 + t_axis_ms
+         FRAME_STATUS.csv / DET_BOX.csv / PERF.csv   메시지별 값 + 실행 번호 + 시간열
+                                                     (FRAME_STATUS·DET_BOX 는 t_axis_ms, PERF 는 t_axis_s = 정수 초)
          runs_summary.csv / .md                      실행(모델 × Raw)별 비교표
     3) 5초마다 진행 상황을 한 줄 출력한다
 
@@ -19,6 +20,7 @@ r"""과제용 CAN 수신 로거 (Windows 노트북 + Vector VN1630A). CANoe Logg
      python canoe_logger.py --summarize "%USERPROFILE%\Desktop\can_logs\20261006_220000"
 """
 import argparse
+import bisect
 import csv
 import json
 import signal
@@ -65,13 +67,22 @@ def pct(v, p):
 
 
 def seq_missing(seqs):
-    """Seq(0~65535 순환) 가 건너뛴 개수 = CAN 으로 잃은 프레임 수."""
-    miss = 0
-    for a, b in zip(seqs, seqs[1:]):
+    """Seq(0~65535 순환) 가 건너뛴 개수 (카메라가 버린 것 + CAN 으로 잃은 것의 합)."""
+    return seq_gaps(seqs, [0] * len(seqs))[0]
+
+
+def seq_gaps(seqs, gaps):
+    """(건너뛴 총수, 카메라가 버렸다고 SeqGap 으로 알린 수, CAN 으로 잃은 수).
+    SeqGap = 카메라가 직전에 버린 프레임 수(송신 쪽이 센 값, 최대 15). Seq 가 건너뛴 곳의 SeqGap 만큼은 카메라 탓, 나머지는 CAN 결번."""
+    total = cam = 0
+    for a, b, g in zip(seqs, seqs[1:], gaps[1:]):
         d = (b - a) % 65536
         if 1 < d < 32768:
-            miss += d - 1
-    return miss
+            miss = d - 1
+            flagged = min(int(g), miss)
+            total += miss
+            cam += flagged
+    return total, cam, total - cam
 
 
 def record(a, out):
@@ -83,6 +94,11 @@ def record(a, out):
     channel = int(a.channel) if str(a.channel).isdigit() else a.channel
     bus = open_bus(a.interface, channel, **kw)
     writer = can.ASCWriter(str(out / "canoe.asc"))
+    try:                                               # 이 프로세스가 도는 동안만 절전 방지 요청 (전원 설정은 안 바꿈, 끝나면 자동 해제)
+        import ctypes
+        ctypes.windll.kernel32.SetThreadExecutionState(0x80000001)    # ES_CONTINUOUS | ES_SYSTEM_REQUIRED
+    except (ImportError, AttributeError, OSError):
+        pass
     if a.interface == "vector":
         ts_source = ("VN1630A 하드웨어 수신 시각 (Vector XL 드라이버 이벤트 timeStamp, ns). 프레임 간 간격과 t_axis_ms 는 이 하드웨어 시각이고, "
                      "절대 시각(first_frame_abs_*)의 기준점만 버스를 연 순간의 PC 시계(PC 시계 - xlGetSyncTime)")
@@ -138,6 +154,10 @@ def record(a, out):
             break
     writer.stop()
     bus.shutdown()
+    try:
+        ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)    # ES_CONTINUOUS 만 = 절전 방지 해제
+    except (NameError, AttributeError, OSError):
+        pass
     meta.update(first_frame_wallclock=first_wall, end_wallclock=datetime.now().isoformat(timespec="milliseconds"),
                 counts=dict(counts))
     if first_abs is not None:
@@ -214,11 +234,51 @@ def summarize(out, bitrate=500000):
             lab = int(v["Label"])
             w.writerow([r, tms(ts), f"{ts:.6f}", int(v["SeqLo"]), int(v["Index"]), lab,
                         names[lab] if lab < len(names) else "", v["Conf"], v["Cx"], v["Cy"], v["W"], v["H"]])
+    # PERF 시각마다 "그 초의 마지막 완결 프레임" 값을 붙인다 (CAN 메시지는 그대로, 이미 받은 FRAME_STATUS·DET_BOX 를 합침)
+    frame_ts = [ts for ts, _ in frames]
+    frame_boxes = {}                                   # 프레임 번호(목록 위치) -> 그 프레임의 DET_BOX 들
+    for ts, v in dets:
+        k = bisect.bisect_right(frame_ts, ts) - 1      # 이 박스 직전의 FRAME_STATUS
+        if k >= 0 and int(v["SeqLo"]) == int(frames[k][1]["Seq"]) % 16:
+            frame_boxes.setdefault(k, []).append((ts, v))
+
+    def last_complete_frame(perf_ts, run_start):
+        """PERF 수신 시각 이전의 마지막 '완결' 프레임. 완결 = 그 시각까지 DET_BOX 를 min(DetCount, 8) 개 이상 받음."""
+        k = bisect.bisect_right(frame_ts, perf_ts) - 1
+        for _ in range(5):                             # 박스를 잃은 프레임이 연달아 있어도 5개까지만 거슬러 올라감
+            if k < 0 or frame_ts[k] < run_start:
+                return None, []
+            got = [bv for bts, bv in frame_boxes.get(k, []) if bts <= perf_ts]
+            if len(got) >= min(int(frames[k][1]["DetCount"]), 8):
+                return k, got
+            k -= 1
+        return None, []
+
+    perf_frame_seqs = {}                               # 실행 -> PERF 행마다의 frame_seq (없으면 None), 요약의 검사용
     with open(out / "PERF.csv", "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
-        w.writerow(["run", "t_axis_ms", "canoe_ts_s", "PcMs", "PostMs", "EthKBps", "CanLoadPct", "DroppedTotal"])
+        # PERF 만 시간열이 정수 초: t_axis_s = (실행의 첫 0x300 수신 시각 기준) 수신 시각의 소수점 버림 (사용자 요청)
+        w.writerow(["run", "t_axis_s", "canoe_ts_s", "PcMs", "PostMs", "EthKBps", "CanLoadPct", "DroppedTotal",
+                    "frame_seq", "frame_ts_s", "edge_ms", "det_count",
+                    "box_class", "box_label", "box_conf", "box_cx", "box_cy", "box_w", "box_h"])
         for ts, v in perfs:
-            w.writerow([run_of(ts), tms(ts), f"{ts:.6f}", v["PcMs"], v["PostMs"], v["EthKBps"], v["CanLoadPct"], int(v["DroppedTotal"])])
+            r = run_of(ts)
+            k, got = last_complete_frame(ts, spans[r - 1][0]) if r else (None, [])
+            extra = [""] * 11
+            if k is not None:
+                fv = frames[k][1]
+                b0 = next((bv for bv in got if int(bv["Index"]) == 0), None)          # 박스 Index 0 = 가장 신뢰도 높은 박스
+                names = label_names(info[r][0])
+                extra = [int(fv["Seq"]), f"{frame_ts[k]:.6f}", fv["EdgeMs"] if fv["EdgeMs"] > 0 else "", int(fv["DetCount"])]
+                if b0 is not None:
+                    lab = int(b0["Label"])
+                    extra += [names[lab] if lab < len(names) else "", lab, b0["Conf"], b0["Cx"], b0["Cy"], b0["W"], b0["H"]]
+                else:
+                    extra += [""] * 7
+            if r:
+                perf_frame_seqs.setdefault(r, []).append(extra[0] if extra[0] != "" else None)
+            w.writerow([r, int(ts - spans[r - 1][0]) if r else "", f"{ts:.6f}", v["PcMs"], v["PostMs"], v["EthKBps"],
+                        v["CanLoadPct"], int(v["DroppedTotal"]), *extra])
 
     rows = []
     for i, seg in enumerate(segs, 1):
@@ -230,6 +290,13 @@ def summarize(out, bitrate=500000):
         iv2 = iv[2:]                                    # 첫 2프레임 이후의 간격 (시작 직후 워밍업 제외)
         my_dets = [v for ts, v in dets if run_of(ts) == i]
         my_perf_all = [v for ts, v in perfs if run_of(ts) == i]
+        perf_secs = [int(ts - a) for ts, v in perfs if run_of(ts) == i]       # PERF 의 t_axis_s (정수 초)
+        perf_dup = len(perf_secs) - len(set(perf_secs))                        # 같은 초가 두 번 나온 개수
+        perf_missing = (max(perf_secs) - min(perf_secs) + 1 - len(set(perf_secs))) if perf_secs else ""   # 최소~최대 사이 빠진 초
+        pfs = perf_frame_seqs.get(i, [])
+        seqs_ok = [s for s in pfs if s is not None]
+        perf_frame_blank = len(pfs) - len(seqs_ok)                              # 붙일 완결 프레임이 없던 PERF 행 수
+        perf_frame_stalls = sum(1 for p, q in zip(seqs_ok, seqs_ok[1:]) if not 0 < (q - p) % 65536 < 32768)   # frame_seq 가 늘지 않은 횟수
         my_perf = my_perf_all[1:] if len(my_perf_all) > 2 else my_perf_all   # 첫 PERF 는 워밍업 값이라 통계에서 제외
         edge = [v["EdgeMs"] for v in vals if v["EdgeMs"] > 0]                # EdgeMs 0 = 값 없음 (시작 직후 2프레임)
         fps10 = [round(sum(1 for ts, _, _ in seg if a + 10 * w <= ts < a + 10 * (w + 1)) / 10, 2)
@@ -241,12 +308,16 @@ def summarize(out, bitrate=500000):
         cnt = Counter(int(v["Label"]) for v in my_dets)
         top = ", ".join(f"{names[k] if k < len(names) else k}:{n}" for k, n in cnt.most_common(5))
         all_classes = ", ".join(f"{names[k] if k < len(names) else k}:{n}" for k, n in sorted(cnt.items()))
-        expected = sum(int(v["DetCount"]) for v in vals)
+        det_total = sum(int(v["DetCount"]) for v in vals)                         # 칩이 낸 검출 수 합
+        expected = sum(min(int(v["DetCount"]), 8) for v in vals)                  # DET_BOX 는 프레임당 최대 8개만 보냄 (max_dets 8)
         rows.append(dict(
             run=i, model=model, raw=raw, t_start_ms=tms(a), t_end_ms=tms(b), t_start_wall_iso=wall, gap_before_s=gap_before,
             duration_s=round(span, 1),
-            frames_rx=len(seg), seq_missing=seq_missing([int(v["Seq"]) for v in vals]),
-            n_0x300=len(seg), n_0x310=len(my_dets), n_0x320=len(my_perf_all),
+            frames_rx=len(seg), seq_missing=seq_gaps([int(v["Seq"]) for v in vals], [v["SeqGap"] for v in vals])[0],
+            cam_dropped_seqgap=seq_gaps([int(v["Seq"]) for v in vals], [v["SeqGap"] for v in vals])[1],
+            can_lost_frames=seq_gaps([int(v["Seq"]) for v in vals], [v["SeqGap"] for v in vals])[2],
+            n_0x300=len(seg), n_0x310=len(my_dets), n_0x320=len(my_perf_all), perf_dup_s=perf_dup, perf_missing_s=perf_missing,
+            perf_frame_blank=perf_frame_blank, perf_frame_stalls=perf_frame_stalls,
             fps_rx=round((len(seg) - 1) / span, 2) if len(seg) > 1 else "", fps_10s=";".join(str(x) for x in fps10),
             fps_cam=med([v["Fps"] for v in vals]),
             interval_ms_median=med(iv), interval_ms_p95=pct(iv, 95), interval_ms_std=round(statistics.pstdev(iv), 2) if len(iv) > 1 else "",
@@ -256,9 +327,10 @@ def summarize(out, bitrate=500000):
             can_load_pct_rx=round(100 * n_msgs * BITS_PER_FRAME / (span + TAIL_S) / bitrate, 2),
             can_load_pct_tx=med([v["CanLoadPct"] for v in my_perf]),
             dropped_total=int(my_perf[-1]["DroppedTotal"]) if my_perf else "",
-            det_boxes_rx=len(my_dets), det_boxes_expected=expected,
+            det_boxes_rx=len(my_dets), det_boxes_expected=expected, det_count_sum=det_total,
+            frames_det_over8=sum(1 for v in vals if int(v["DetCount"]) > 8),
             frames_with_det_pct=round(100 * sum(1 for v in vals if v["DetCount"]) / len(vals), 1),
-            det_per_frame=round(expected / len(vals), 2),
+            det_per_frame=round(det_total / len(vals), 2),
             conf_mean=round(statistics.mean(v["Conf"] for v in my_dets), 3) if my_dets else "", top_classes=top,
             class_counts=all_classes))
 
@@ -267,18 +339,29 @@ def summarize(out, bitrate=500000):
             w = csv.DictWriter(fh, fieldnames=list(rows[0]))
             w.writeheader()
             w.writerows(rows)
-        cols = ["run", "model", "raw", "duration_s", "frames_rx", "seq_missing", "fps_rx", "fps_10s", "interval_ms_std_skip2",
+        cols = ["run", "model", "raw", "duration_s", "frames_rx", "seq_missing", "cam_dropped_seqgap", "can_lost_frames", "fps_rx", "fps_10s", "interval_ms_std_skip2",
                 "edge_ms", "edge_zero_frames", "pc_ms", "post_ms", "eth_KBps", "can_load_pct_rx", "n_0x300", "n_0x310",
-                "n_0x320", "det_boxes_rx", "det_boxes_expected", "frames_with_det_pct", "conf_mean", "class_counts"]
+                "n_0x320", "perf_dup_s", "perf_missing_s", "perf_frame_blank", "perf_frame_stalls", "det_boxes_rx", "det_boxes_expected", "frames_with_det_pct", "conf_mean", "class_counts"]
         with open(out / "runs_summary.md", "w", encoding="utf-8") as fh:
             fh.write("| " + " | ".join(cols) + " |\n|" + "---|" * len(cols) + "\n")
             for r in rows:
                 fh.write("| " + " | ".join(str(r[k]) for k in cols) + " |\n")
     meta["definitions"] = dict(
-        t_axis_ms="첫 프레임 = 0, VN1630A 수신 시각, 정수 ms",
+        det_boxes_expected="sum(min(DetCount, 8)) — DET_BOX 는 프레임당 최대 8개만 전송되므로 기대값도 8개로 자름. 칩 검출 수의 합은 det_count_sum, 8개 넘은 프레임 수는 frames_det_over8",
+        t_axis_ms="첫 프레임 = 0, VN1630A 수신 시각, 정수 ms (FRAME_STATUS.csv·DET_BOX.csv)",
+        t_axis_s="PERF.csv 만: 실행의 첫 0x300 수신 시각 기준 수신 시각의 소수점 버림 정수 초 (예 1.05 → 1). canoe_ts_s 는 소수 초 그대로",
+        n_0x320="PERF 는 프레임과 무관한 1초 타이머로 첫 프레임 기준 k초+50ms 에 송신 → 개수 = 정수 초 구간 수 (30초 run 이면 약 29~30개)",
+        perf_dup_s_perf_missing_s="PERF t_axis_s 의 중복 개수 / 최소~최대 사이 빠진 초 (둘 다 0 이면 1,2,3… 연속)",
+        PERF_frame_columns=("PERF.csv 의 frame_seq·frame_ts_s·edge_ms·det_count·box_*: 그 초(PERF 수신 시각)의 '마지막 완결 프레임' 값이며 평균·집계가 아님. "
+                            "완결 프레임 = PERF 수신 시각 이전에 받은 FRAME_STATUS 중 DET_BOX 를 min(DetCount, 8)개 이상 이미 받은 마지막 것 "
+                            "(DET_BOX 는 SeqLo=Seq 하위 4비트로 짝지음). box_* 는 DET_BOX Index 0(최고 신뢰도), 검출 0개면 빈 칸. "
+                            "edge_ms 는 EdgeMs=0(값 없음)이면 빈 칸. CAN 메시지·DBC 는 바뀌지 않았고 로거가 이미 받은 값을 합침"),
+        perf_frame_blank_perf_frame_stalls="붙일 완결 프레임이 없던 PERF 행 수 / frame_seq 가 이전 PERF 보다 늘지 않은 횟수 (0 이면 PERF 마다 프레임이 앞으로 감)",
         fps_rx="(0x300 개수 - 1) / (첫~마지막 0x300 시각). 송신 시작 지연은 빠짐. 카메라 쪽 fps_avg 는 시작 지연이 섞여 더 낮게 나올 수 있음",
         fps_10s="실행 시작부터 꽉 찬 10초 구간별 fps (구간이 없으면 빈 칸)",
-        seq_missing="Seq 가 건너뛴 개수 = CAN 으로 잃은 프레임 수 (카메라가 못 준 것은 포함 안 됨)",
+        seq_missing="Seq 가 건너뛴 총 개수 = 카메라가 버린 것 + CAN 으로 잃은 것",
+        cam_dropped_seqgap="Seq 가 건너뛴 곳의 SeqGap(카메라가 버렸다고 알린 수, 최대 15) 합 = 카메라 입력 큐가 버린 프레임",
+        can_lost_frames="seq_missing - cam_dropped_seqgap = CAN 으로 잃은 프레임 (이 값이 진짜 CAN 결번, 0 이어야 정상)",
         edge_ms="EdgeMs 가 0 인 프레임(시작 직후 값 없음) 제외한 중앙값, 0 이었던 프레임 수는 edge_zero_frames",
         pc_ms_post_ms_eth_KBps="PERF 의 중앙값, 실행의 첫 PERF 는 워밍업이라 제외 (PERF 가 3개 이하면 전부 사용)",
         interval_ms_skip2="첫 2프레임 이후 간격만의 통계",
