@@ -35,7 +35,14 @@ while True:
 class OakSource:
 
     def __init__(self, args):
-        self.args, self.edge_by_seq = args, {}
+        self.args, self.edge_by_seq, self.edge_queue = args, {}, None
+
+    def wait_edge(self, seq, timeout=0.25):
+        end = time.monotonic() + timeout
+        while seq not in self.edge_by_seq and self.edge_queue is not None and time.monotonic() < end:
+            for buf in self.edge_queue.tryGetAll():
+                self.edge_by_seq[buf.getSequenceNum()] = float(bytes(buf.getData()).decode())
+            time.sleep(0.01)
 
     def frames(self, stop):
         import cv2
@@ -56,7 +63,7 @@ class OakSource:
             edge_script.setScript(EDGE_SCRIPT)
             network.out.link(edge_script.inputs["det"])
             det_queue = network.out.createOutputQueue()
-            edge_queue = edge_script.outputs["edge"].createOutputQueue()
+            edge_queue = self.edge_queue = edge_script.outputs["edge"].createOutputQueue()
             frame_queue = None
             if a.raw == "on":
                 frame_queue = network.passthrough.createOutputQueue()
@@ -95,6 +102,9 @@ class FakeSource:
 
     def __init__(self, args):
         self.args, self.edge_by_seq = args, {}
+
+    def wait_edge(self, seq, timeout=0.25):
+        pass
 
     def frames(self, stop):
         a, t0, seq = self.args, time.monotonic(), 0
@@ -162,6 +172,7 @@ def main(argv=None):
     tx_in_sec, fps_win, prev_seq = 0, deque(), None
     det_rows = []
     t_start = time.monotonic()
+    t_first = None
     nic0 = nic_prev = read_nic_bytes(a.nic) if a.nic else None
 
     def send(m):
@@ -176,7 +187,10 @@ def main(argv=None):
     try:
         for f in source.frames(stop):
             now = time.monotonic()
-            if now - t_start >= a.duration:
+            if t_first is None:
+                t_first = last_perf = now
+                nic0 = nic_prev = read_nic_bytes(a.nic) if a.nic else None
+            if now - t_first >= a.duration:
                 break
             fps_win.append(f["dev_t"])
             while fps_win[0] < f["dev_t"] - 1.0:
@@ -185,6 +199,7 @@ def main(argv=None):
             gap = f["seq"] - prev_seq - 1 if prev_seq is not None else 0
             dropped += max(gap, 0)
             prev_seq = f["seq"]
+            source.wait_edge(f["seq"])
             edge = source.edge_by_seq.get(f["seq"], 0)
             f["t_send"] = time.time()
             send(frame_status(f["seq"], len(f["dets"]), fps, edge, min(max(gap, 0), 15), MODEL_IDS[a.model], a.raw == "on"))
@@ -217,7 +232,9 @@ def main(argv=None):
         pass
     finally:
         stop.set()
-        dur = time.monotonic() - t_start
+        t_end = time.monotonic()
+        dur = max(t_end - (t_first if t_first is not None else t_start), 1e-6)
+        startup_s = round((t_first if t_first is not None else t_end) - t_start, 1)
         nic1 = read_nic_bytes(a.nic) if a.nic else None
         time.sleep(0.3)
         bus.shutdown()
@@ -239,7 +256,7 @@ def main(argv=None):
     edges = [source.edge_by_seq[r["seq"]] for r in rows if r["seq"] in source.edge_by_seq]
     pcs = [r["total_ms"] - source.edge_by_seq[r["seq"]] for r in rows if r["seq"] in source.edge_by_seq]
     eth = (nic1 - nic0) / dur if nic0 is not None and nic1 is not None else sum(r["raw_bytes"] for r in rows) / dur
-    summary = dict(model=a.model, raw=a.raw, camera_fps=a.fps, seconds=round(dur, 1), frames=len(rows),
+    summary = dict(model=a.model, raw=a.raw, camera_fps=a.fps, seconds=round(dur, 1), startup_s=startup_s, frames=len(rows),
                    dropped=dropped, fps_avg=round(len(rows) / dur, 2), edge_ms=med(edges), pc_ms=med(pcs),
                    post_ms=med([r["post_ms"] for r in rows]), eth_MBps=round(eth / 1e6, 3),
                    eth_source="nic" if nic0 is not None else "raw_frames_only",

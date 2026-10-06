@@ -110,3 +110,15 @@ CAN으로 받을 수 있는지 확인하고, 파라미터 50개 이상을 추출
 | 시험 | 가상 채널 ch1 송신(`can_demo --fake`) → ch2 수신(`canoe_sim`) 10초: 송신 137 · 수신 130 프레임, 에러 0. 실제 버스(VN1630A) 는 미확인 |
 | Windows | `can_canoe/WINDOWS_SETUP.md` 신규. 클래식 500 kbps · `oakd_canoe.dbc` |
 | 다음 | Windows CANoe 설정 + 배선 → `--fake` Trace 확인 → 실카메라 1모델 → `run_matrix.sh` 6회 |
+
+## 2026-10-06 (추가 5) — 실카메라 CAN 실측 2건, can_demo 수정, Windows 협업
+
+| 항목 | 내용 |
+|---|---|
+| 협업 | 두 PC Claude 세션 크로스 세션 메시지로 조율. 막힌 원인: Windows `crossSessionInbound` 미설정 + 권한 모드 차이(bypass↔auto)로 메시지 보류 → 양쪽 `accept` 로 해결 |
+| 프로토콜 | 사용자 요청 → Ubuntu `START` → Windows 로거 켜고 `READY` → Ubuntu 카메라 실행 → `RESULT` → Windows `LOGGED` |
+| 실측 | yolov6n Raw 끔 30초 2회: 송신 112 = 수신 112, 결번 0, 에러 0, 수신 5.02~5.03 fps, EdgeMs 중앙값 69~70 ms (`results/can_canoe/20261006/`) |
+| 발견 | 카메라 시작 지연 약 12초가 `--duration`·`fps_avg` 에 섞임(3.1). 처음 프레임 EdgeMs 0 전송(r2 8개), 처음 2프레임 pc_ms 음수. 검출 3~4개는 화면 전체급 박스(bicycle·motorcycle) → 오검출 의심 |
+| 수정 | `can_demo.py`(+`_no_comments`): duration 을 첫 프레임부터, `startup_s` 기록, EdgeMs 대기(0.25초). Kvaser 가상 채널 송수신: EdgeMs 0 프레임 101개 중 0개, selftest 통과 |
+| 점검 | Windows 로거 피드백: 타임스탬프 출처(VN1630A 하드웨어), 절대시각 meta, 드리프트는 5분 이상 필요. 이 노트북에 CANoe 미설치 → 대체 로거 사용 명시 또는 CANoe PC 에서 1회 필요 (사용자 결정 대기) |
+| 다음 | 사용자 지시 시: Raw 켬 60초 확인 → DURATION=300 으로 6회 (약 40분) |

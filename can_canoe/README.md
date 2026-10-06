@@ -86,6 +86,10 @@ python3 analyze.py --log canoe.asc --runs-root runs/<날짜_시각>
 ```
 run_matrix.sh 는 기본이 **클래식 CAN 500 kbps** (FD=0, FD_FRAMES=0, 2026-10-06 변경) 다. CAN FD 로 하려면 `FD=1 FD_FRAMES=1`.
 
+## 측정 시간 · EdgeMs (2026-10-06 수정)
+- `--duration` 은 **첫 프레임이 온 뒤부터** 잰다. 카메라가 켜지는 시간(약 12~16초)은 `summary.csv` 의 `startup_s` 로 따로 기록 (`fps_avg`·`eth_MBps` 도 첫 프레임부터).
+- 칩 지연값(EdgeMs)이 늦게 오는 프레임은 최대 0.25초 기다린 뒤 보낸다. 끝내 없으면 0 = **값 없음** (분석에서 제외).
+
 ## 시간축이 이렇게 정해진다
 | 값 | 무엇의 시계 | 용도 |
 |---|---|---|
