@@ -2,6 +2,8 @@ __pycache__/
 ._*
 .DS_Store
 **/runs/
+!results/**/runs/
+# (위 예외: results/ 안의 runs/ 는 송신 기록 CSV 만 담으므로 추적한다. 카메라 PC 의 원본 runs/ 는 계속 제외)
 *.superblob
 # traffic_light 중간 생성물 — ②~④ 스크립트로 다시 만든다 (.xml·config.json 은 글자라 남김)
 traffic_light/02_onnx/*.onnx

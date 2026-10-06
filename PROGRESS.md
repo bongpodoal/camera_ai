@@ -182,3 +182,31 @@ CAN으로 받을 수 있는지 확인하고, 파라미터 50개 이상을 추출
 | 코드 | `can_msgs.MODEL_IDS` 에 `traffic_light_v8n: 4`, DBC ModelId 설명 `4=traffic_light_v8n`, `can_demo`(ARCHIVES), `analyze`(라벨 red·green), `run_matrix.sh` 모델 목록 = yolov6n · traffic_light_v8n · traffic_light (yolov8n 제거, `V8_ARCHIVE` 삭제) |
 | 시험 | 실카메라 20초 (가상 CAN): 5 fps, 엣지 지연 80.3 ms (yolov6n 69.5), 검출 0개 (장면에 신호등 없음, 정상). 실제 신호등 인식은 미확인 |
 | 공개 | 가중치·NNArchive 는 git 에 올리지 않음 (사용자가 공개 여부 결정) |
+
+## 2026-10-07 (추가 12) — 3모델 5분 측정 완료 (Raw 끔)
+
+| 항목 | 내용 |
+|---|---|
+| 조건 | 각 300초, 5 fps, 클래식 CAN 500 kbps, Raw 끔, 기본 `--edge-wait 0`, PERF 별도 타이머. 순서 yolov6n → traffic_light_v8n(last.pt) → traffic_light(YOLO11s). 카메라 위치는 사용자가 디버그 창(`~/Desktop/oakd_debug_view.py`)으로 맞춤 |
+| 송신=수신 | 11,629 / 1,822 / 1,918 프레임 모두 일치, CAN 결번 0 |
+| 엣지 지연 중앙 | 71 / 80 / 154 ms |
+| 검출 | yolov6n 박스 10,276개(DET_BOX 9,823, 프레임당 8개 제한으로 453 잘림) · v8n 20개(red 11·green 9, 검출 없는 프레임 98.7%) · 11s 116개(green 106·red 8·off 2, 93.8%) |
+| PERF | 세 run 모두 t_axis_s 1~300 연속, 중복·누락 0, 간격 1000.0 ms(std 0.1). 새 열(frame_seq·edge_ms·det_count·box_*) 채워짐 |
+| 시간 | 수신 구간 300.05초, fps_rx 5.0(10초 구간 모두 5.0~5.1), 간격 std(처음 2프레임 제외) 1.13 / 1.22 / 0.97 ms |
+| EdgeMs=0 비율 | 12.6% / 7.9% / 11.8% (늦게 오는 칩 지연값, 값 없음 처리) |
+| 문제 | 2/3 첫 시도 카메라 시작 실패(`Couldn't open stream`) → 30초 후 재시도 성공. 1/3 `seconds` 305.4(종료 시간 혼입) |
+| Windows 로거 개선(미커밋) | 기대 박스 수=sum(min(DetCount,8)), `det_count_sum`·`frames_det_over8`, `cam_dropped_seqgap`·`can_lost_frames` 구분 열 |
+| 사용자 결정 대기 | 첫 PERF 제외 규칙 제거, Windows 로그 git 업로드(허락 시 `results/can_canoe/20261007/`) |
+| 미완 | Raw 켬 시험(이미지로 검출 확인), 인식률(정답 비교), `can_demo` seconds 보정 |
+
+## 2026-10-07 (추가 13) — 5분 3모델 합치기, 드리프트 실측, 첫 PERF 제외 규칙 제거 승인
+
+| 항목 | 내용 |
+|---|---|
+| 로그 | 사용자가 Windows 로그를 push 함(45336c5, `results/can_canoe/20261007/logs/`), 로거 수정판 52fb619. 이 PC 에 Ubuntu 송신 기록을 `results/can_canoe/20261007/runs/` 로 복사 (미커밋) |
+| 합치기 (`analyze.py`, 워밍업 3초 제외) | 송신 = 수신: 1501/1501, 1502/1502, 1502/1502 |
+| **카메라 시계 드리프트** | yolov6n 13.1 · traffic_light_v8n 15.0 · traffic_light 14.1 ppm — 일관되게 약 14 ppm(카메라가 빠름), 300초 누적 3.7 · 5.3 · 4.0 ms (1시간이면 약 50 ms) |
+| PC 시계 드리프트 | 3.2 · 6.9 · 8.0 ppm (300초 누적 1.0 · 2.0 · 2.4 ms) |
+| 결론 | 지난 과제 지적(카메라 시계를 시간축으로 쓰면 오차가 누적)의 정량 근거. 시간축은 VN1630A 수신 시각 하나로 통일 |
+| 사용자 결정 | 첫 PERF 제외 규칙 제거 승인 → Windows 로거에서 제거 요청함 (표본 3개 −0.4/0.0/+0.1 ms) |
+| 대기 | Windows 로거 수정·`results/can_canoe/20261007/` 커밋·푸시는 사용자 지시 후. `can_demo` seconds 보정, Raw 켬 시험, 인식률은 미완 |

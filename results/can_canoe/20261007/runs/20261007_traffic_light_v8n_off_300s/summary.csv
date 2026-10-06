@@ -1,0 +1,2 @@
+model,raw,camera_fps,seconds,startup_s,frames,dropped,fps_avg,edge_ms,pc_ms,post_ms,eth_MBps,eth_source,can_tx_frames,can_tx_errors,can_tx_load_pct
+traffic_light_v8n,off,5.0,300.2,13.3,1502,0,5.0,80.23,2.7,0.0,0.01,nic,1822,0,0.16

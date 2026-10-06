@@ -1,7 +1,7 @@
 # camera_ai — 작업 메모리 (다른 컴퓨터에서 이어서 작업하기 위한 파일)
 
 Claude Code는 이 파일을 자동으로 읽는다. 사람도 이 파일 하나로 맥락을 잡을 수 있게 쓴다.
-마지막 갱신: 2026-10-06.
+마지막 갱신: 2026-10-07.
 
 ## 1. 프로젝트가 무엇인가
 
@@ -57,6 +57,10 @@ YOLOv8n 예제(T7 외장하드 `camera_ai/*/yolov8n/`, 실카메라 검증 19 FP
 **★ 2026-10-06 새 과제 — `can_canoe/` (README 먼저 읽을 것).** 카메라 출력을 CAN 으로 CANoe 에 보내 받고, Raw 수신 여부(끔/켬)별 연산·통신 속도를 3모델로 비교.
    - **2026-10-06 최종 결정: CANoe 는 쓰지 않는다 (사용자 확정).** 수신·시간축은 Windows 노트북의 `can_canoe/canoe_logger.py`(python-can, VN1630A) 가 맡고, 시각 = **VN1630A 하드웨어 수신 시각**(meta.json `timestamp_source`). 문서·결과에 "CANoe 대신 python-can 기반 로거 사용" 명시. 아래 CANoe 설정 안내는 폐기(참고용). 실제 CANoe `.asc` 읽기 확인은 해당 없음.
    - 현재 상태: yolov6n Raw 끔 30초 2회 송신=수신 일치, `analyze.py` 합치기 성공 (`results/can_canoe/20261006/`). 드리프트는 워밍업(기본 3초) 제외 후 7~11 ppm(15초 데이터라 참고치) → **5분 이상 run 필요**. 5분 이상 측정은 사용자가 직접 시작·지시. 두 PC Claude 는 `START`→`READY`→카메라 실행→`RESULT`→`LOGGED` 로 조율, 양쪽 `crossSessionInbound=accept` 필수.
+   - **2026-10-07 5분 측정 결과 (Raw 끔·5 fps·클래식 500k, 송신=수신, 결번 0):** yolov6n 11,629프레임(엣지 71 ms, 박스 프레임당 6.85) · traffic_light_v8n(last.pt) 1,822(80 ms, 검출 20) · traffic_light(YOLO11s) 1,918(154 ms, 검출 116). PERF 1~300 연속·간격 1000 ms. 로그는 Windows 바탕화면 `can_logs\20261007_*`(미업로드), 송신 기록은 `can_canoe/runs/20261007_*`(git 제외). 상세 `PROGRESS.md` 추가 12.
+   - **드리프트 실측 (5분×3, analyze.py):** 카메라 시계가 VN1630A 시각보다 약 **14 ppm** 빠름 (13.1·15.0·14.1), 300초 누적 4 ms. PC 시계 3~8 ppm. 첫 PERF 제외 규칙 제거는 사용자가 승인함.
+   - **두 PC 협업 규칙:** 사용자가 모델·시간 지시 → Ubuntu 가 Windows 세션에 `START <run_id> model raw duration` → Windows 로거 켜고 `READY` → Ubuntu 가 `can_demo.py` 실행 → `RESULT` → Windows `LOGGED`. 한 번에 run 하나. 메시지가 안 가면: 양쪽 `~/.claude/settings.json` `"crossSessionInbound": "accept"`, Remote Control 재연결 시 세션 주소(ref)가 바뀌니 `ListAgents` 로 확인. 측정 중 두 PC 절전 금지(Ubuntu 는 `systemd-inhibit`). 카메라가 직전 run 직후 시작 실패(`Couldn't open stream`)하면 30초 대기 후 같은 run_id 로 재시도.
+   - **수정 보류 목록:** (1) `can_demo` 의 `seconds` 에 종료 때 장치 닫는 시간(약 5초)이 섞이는 경우(1/3 만 발생) 보정 (2) 수신 간격 표준편차가 세 run 모두 약 1.0~1.2 ms(원인 미확인, 송신 타이머·USB-CAN·스레드 추정) (3) 첫 PERF 제외 규칙 제거 여부(세 표본 −0.4/0.0/+0.1 ms, 사용자 결정) (4) 실제 신호등 인식은 미확인, 인식률(정답 비교) 보류.
    - 지난 과제 지적: 카메라(엣지) 시계를 시간축으로 쓰면 시간이 갈수록 오차가 커짐 → **시간축 = CANoe 가 받은 시각 하나**. AURIX 는 쓰지 않기로 함 (이전 작업은 `can_canoe/_aurix_unused/`).
    - Raw = 카메라 원본(AI 입력) 프레임으로 해석 (사용자 확인: "원본 화면이 맞는 것 같다"). 인식률(정답 비교) 테스트는 **나중에 다시 논의하기로 함**.
    - 구성: 카메라 PC(Ubuntu 22.04.5, CAN 어댑터 준비됨) → CAN 500 kbps → CANoe PC(Windows, CANoe 19). CANoe 는 Windows 전용이라 카메라 PC 에는 설치하지 않음. CANoe 가 없으면 `canoe_sim.py` 로 두 번째 어댑터에서 받아 `.asc` 저장 가능.
@@ -78,7 +82,7 @@ YOLOv8n 예제(T7 외장하드 `camera_ai/*/yolov8n/`, 실카메라 검증 19 FP
 |---|---|---|---|
 | 1 | ~~CAN 1단계 (fake 송신)~~ **완료:** fake 276=276, 실카메라 yolov6n Raw 끔 30초 2회 112=112 | — | 완료 |
 | 2 | ~~어댑터 드라이버~~ **해결 (2026-10-06):** Kvaser LinuxCAN 5.52 설치 (gcc-12 + `sudo make install`), `listChannels` 에서 Leaf v3 = ch0 확인. 커널 socketcan 은 이 ID(`0117`) 미지원이라 `can0` 없음 → `kvaser` 인터페이스 사용 | — | 완료 |
-| 3 | **측정 진행:** (a) Raw 켬 60초 1회 (이미지 저장·eth·오검출 확인) → (b) 5분(DURATION=300) 이상 측정 — 사용자가 시작 지시. Windows 로거 먼저 켜고 `READY` 후 카메라 실행 → `analyze.py` 로 합치기 (`results/can_canoe/<날짜>/{runs,logs}`) | Ubuntu + Windows 노트북 | 지시 대기 |
+| 3 | **5분 측정 3모델 완료 (2026-10-07, Raw 끔)** — 송신=수신 일치(11,629 / 1,822 / 1,918), 결번 0. 남은 것: (a) 사용자 결정 2건(첫 PERF 제외 규칙 제거, Windows 로그 git 업로드) (b) 로그 `results/can_canoe/20261007/` 정리·`analyze.py` 합치기·비교표 (c) Raw 켬 60초(이미지·오검출 확인) (d) 필요 시 Raw 켬 5분 | Ubuntu + Windows 노트북 | 사용자 결정 대기 |
 | 4 | 5 fps 최신화 큐 5분 지연 측정 (`run_latest_3models.sh`) | 카메라 PC | 준비 완료 |
 | 5 | 신호등 YOLO11n 재학습 (아래 A) | RTX 4080 PC | 미착수 |
 | 6 | 인식률(정답 비교) 테스트 | — | 보류, 나중에 논의 |

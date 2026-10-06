@@ -1,0 +1,2 @@
+model,raw,camera_fps,seconds,frames,dropped,fps_avg,edge_ms,pc_ms,post_ms,eth_MBps,eth_source,can_tx_frames,can_tx_errors,can_tx_load_pct
+yolov6n,off,5.0,30.0,93,0,3.1,69.51,2.76,0.0,0.052,nic,112,0,0.1
