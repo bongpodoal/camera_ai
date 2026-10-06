@@ -207,14 +207,46 @@ def main(argv=None):
     t_first = None                # 첫 프레임 도착 시각: --duration 은 여기서부터 잰다 (카메라 시작 지연 제외)
     nic0 = nic_prev = read_nic_bytes(a.nic) if a.nic else None
 
+    lock = threading.RLock()      # 메인 루프와 PERF 타이머 스레드가 같이 쓰는 값·CAN 송신을 보호
+
     def send(m):
         nonlocal can_tx, can_err, tx_in_sec
-        try:
-            bus.send(m, timeout=0.05)
-            can_tx += 1
-            tx_in_sec += 1
-        except can.CanError:
-            can_err += 1
+        with lock:
+            try:
+                bus.send(m, timeout=0.05)
+                can_tx += 1
+                tx_in_sec += 1
+            except can.CanError:
+                can_err += 1
+
+    def perf_loop():
+        """PERF 를 프레임 도착과 상관없이, 첫 프레임 기준 k초 + 50 ms (k=1,2,3…) 에 정확히 1초 간격으로 보낸다.
+        (+50 ms 는 수신 쪽에서 정수 초로 내림해도 k 로 안정적으로 떨어지게 하는 여유)"""
+        nonlocal last_perf, nic_prev, tx_in_sec
+        k = 1
+        while not stop.is_set():
+            if t_first is None:
+                stop.wait(0.01)
+                continue
+            if stop.wait(max(0.0, t_first + k + 0.05 - time.monotonic())):
+                break
+            with lock:
+                now = time.monotonic()
+                span = now - last_perf
+                while recent and recent[0][0] < now - 1.0:
+                    recent.popleft()
+                pcs = [r[2] - source.edge_by_seq[r[1]] for r in recent if r[1] in source.edge_by_seq]
+                nic_now = read_nic_bytes(a.nic) if a.nic else None
+                eth = (nic_now - nic_prev) / span if nic_now is not None and nic_prev is not None \
+                    else sum(r[4] for r in recent) / span
+                nic_prev = nic_now
+                send(perf(med(pcs) or 0, med([r[3] for r in recent]) or 0, eth / 1000,
+                          100 * tx_in_sec / span * BITS_PER_FRAME / a.bitrate, dropped))
+                tx_in_sec, last_perf = 0, now
+            k += 1
+
+    perf_thread = threading.Thread(target=perf_loop, daemon=True)
+    perf_thread.start()
 
     try:
         for f in source.frames(stop):
@@ -248,24 +280,13 @@ def main(argv=None):
             f["frame"] = None
             f["n_det"] = len(f["dets"])
             rows.append(f)
-            recent.append((now, f["seq"], f["total_ms"], f["post_ms"], f["raw_bytes"]))
-            # 1초마다 PERF (속도 비교용 요약)
-            if now - last_perf >= 1.0:
-                span = now - last_perf
-                while recent and recent[0][0] < now - 1.0:
-                    recent.popleft()
-                pcs = [r[2] - source.edge_by_seq[r[1]] for r in recent if r[1] in source.edge_by_seq]
-                nic_now = read_nic_bytes(a.nic) if a.nic else None
-                eth = (nic_now - nic_prev) / span if nic_now is not None and nic_prev is not None \
-                    else sum(r[4] for r in recent) / span
-                nic_prev = nic_now
-                send(perf(med(pcs) or 0, med([r[3] for r in recent]) or 0, eth / 1000,
-                          100 * tx_in_sec / span * BITS_PER_FRAME / a.bitrate, dropped))
-                tx_in_sec, last_perf = 0, now
+            with lock:
+                recent.append((now, f["seq"], f["total_ms"], f["post_ms"], f["raw_bytes"]))
     except KeyboardInterrupt:
         pass
     finally:
         stop.set()
+        perf_thread.join(timeout=2)
         t_end = time.monotonic()
         dur = max(t_end - (t_first if t_first is not None else t_start), 1e-6)
         startup_s = round((t_first if t_first is not None else t_end) - t_start, 1)
