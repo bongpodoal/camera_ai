@@ -56,3 +56,18 @@ CAN으로 받을 수 있는지 확인하고, 파라미터 50개 이상을 추출
 | 변환 스크립트 | ②~⑤ 에 `[크기 [이름]]` 인자 추가 (기본 512x288 traffic_light) |
 | YOLO11n 결정 | 11s 과도 → 11n 재학습. 공개 모델 없음. 맥 M5 학습 4~5.5시간(960) 실측 → RTX 4080 PC 에서 학습 |
 | 학습 스크립트 | `traffic_light/00_train/train_yolo.py` (+ `_no_comments`): 데이터셋 자동 다운로드, 11s 와 같은 설정, 960·416 평가. 합성 데이터 1 epoch 로 흐름 검증 |
+
+## 2026-10-06 — CAN 과제 (`can_canoe/`, AURIX 대신 CANoe)
+
+| 항목 | 내용 |
+|---|---|
+| 과제 | 카메라 출력 CAN 수신 · 원본 화면 기준 인식 수준(후처리) · Raw 수신 여부별 연산/통신 속도 · 3모델 |
+| 지적 사항 | 카메라(엣지) 시계를 시간축으로 쓰면 시간이 갈수록 오차가 커짐 |
+| 계획 변경 | AURIX 사용 안 함 → 수신·시간축은 CANoe (`_aurix_unused/` 에 이전 작업 보관) |
+| 구성 | PC 가 검출 결과를 CAN 500 kbps 로 송신 → CANoe 가 받은 시각을 로그에 찍음 = 시간축(정수 ms). 카메라·PC 시계는 CANoe 시계에서 벌어지는 속도(ppm)만 따로 보고 |
+| DBC | `oakd_canoe.dbc`: FRAME_STATUS 0x300 · DET_BOX 0x310 · PERF 0x320 (값 이름표 없음, ASCII) |
+| Raw | 원본 = AI 입력 프레임. `--raw on` 이더넷으로 받아 박스 그림, `--raw off` 칩 위 Script 가 버림 |
+| 측정 | `run_matrix.sh` 3모델 × Raw 끔/켬 = 6번 → `analyze.py` 가 `compare.md` · `frames_axis.csv` · `drift.png` |
+| 검증 | 맥에서 `selftest.py` 통과 (가상 CAN, 4번 실행을 한 로그에서 분리·짝짓기, ppm 복원, 시간축 정수 ms) |
+| 미검증 | 실제 카메라 경로, 실제 CANoe 의 DBC 로드·로그 읽기, 6회 실측 |
+| 보류 | 인식률(정답 비교) 테스트 — 합성 영상·LISA·AI Hub 후보, 나중에 논의 |

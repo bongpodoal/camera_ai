@@ -1,0 +1,44 @@
+VERSION ""
+
+
+NS_ :
+
+BS_:
+
+BU_: AURIX PC
+
+
+BO_ 256 SYNC: 8 AURIX
+ SG_ SyncCnt : 0|8@1+ (1,0) [0|255] "" PC
+ SG_ TimeUs : 8|32@1+ (1,0) [0|4294967295] "us" PC
+
+BO_ 257 ECHO: 8 AURIX
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" PC
+ SG_ RxTimeUs : 16|32@1+ (1,0) [0|4294967295] "us" PC
+
+BO_ 768 FRAME_STATUS: 8 PC
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" AURIX
+ SG_ DetCount : 16|8@1+ (1,0) [0|255] "" AURIX
+ SG_ Fps : 24|16@1+ (0.1,0) [0|6553.5] "fps" AURIX
+ SG_ EdgeMs : 40|12@1+ (1,0) [0|4095] "ms" AURIX
+ SG_ SeqGap : 52|4@1+ (1,0) [0|15] "" AURIX
+ SG_ ModelId : 56|4@1+ (1,0) [0|15] "" AURIX
+ SG_ RawOn : 60|1@1+ (1,0) [0|1] "" AURIX
+
+BO_ 784 DET_BOX: 8 PC
+ SG_ SeqLo : 0|4@1+ (1,0) [0|15] "" AURIX
+ SG_ Index : 4|4@1+ (1,0) [0|15] "" AURIX
+ SG_ Label : 8|7@1+ (1,0) [0|127] "" AURIX
+ SG_ Conf : 15|7@1+ (0.01,0) [0|1.27] "" AURIX
+ SG_ Cx : 22|10@1+ (0.001,0) [0|1.023] "" AURIX
+ SG_ Cy : 32|10@1+ (0.001,0) [0|1.023] "" AURIX
+ SG_ W : 42|10@1+ (0.001,0) [0|1.023] "" AURIX
+ SG_ H : 52|10@1+ (0.001,0) [0|1.023] "" AURIX
+
+
+CM_ BO_ 256 "AURIX time master. Sent every 1 s. TimeUs = AURIX STM in microseconds (wraps every 71.6 min).";
+CM_ BO_ 257 "AURIX reply to FRAME_STATUS. RxTimeUs = STM at the moment the frame was received. This is the common time axis.";
+CM_ BO_ 768 "PC to AURIX, once per processed camera frame. EdgeMs = on-chip latency measured with the chip clock (short interval, no drift).";
+CM_ BO_ 784 "PC to AURIX, one per detection (top N by confidence). Box center/size normalized 0..1.";
+CM_ SG_ 768 ModelId "0=yolov6n 1=yolov8n 2=traffic_light 3=traffic_light_11n";
+CM_ SG_ 768 RawOn "1 = host also receives the raw image";

@@ -54,6 +54,15 @@ YOLOv8n 예제(T7 외장하드 `camera_ai/*/yolov8n/`, 실카메라 검증 19 FP
 
 ## 3. 다음 할 일 (우선순위)
 
+**★ 2026-10-06 새 과제 — `can_canoe/` (README 먼저 읽을 것).** 카메라 출력을 CAN 으로 CANoe 에 보내 받고, Raw 수신 여부(끔/켬)별 연산·통신 속도를 3모델로 비교.
+   - 지난 과제 지적: 카메라(엣지) 시계를 시간축으로 쓰면 시간이 갈수록 오차가 커짐 → **시간축 = CANoe 가 받은 시각 하나**. AURIX 는 쓰지 않기로 함 (이전 작업은 `can_canoe/_aurix_unused/`).
+   - Raw = 카메라 원본(AI 입력) 프레임으로 해석 (사용자 확인: "원본 화면이 맞는 것 같다"). 인식률(정답 비교) 테스트는 **나중에 다시 논의하기로 함**.
+   - 구성: 카메라 PC(Ubuntu 22.04.5, CAN 어댑터 준비됨) → CAN 500 kbps → CANoe PC(Windows, CANoe 19). CANoe 는 Windows 전용이라 카메라 PC 에는 설치하지 않음. CANoe 가 없으면 `canoe_sim.py` 로 두 번째 어댑터에서 받아 `.asc` 저장 가능.
+   - 맥에서 `selftest.py` 통과. **미검증: 실제 카메라 경로(특히 `--raw off` 의 칩 위 버림 Script), 실제 CANoe 의 DBC 로드·로그 읽기, 6회 실측.**
+   - 설정은 5 fps 고정 + AI 입력 큐 크기 1 비차단 (`tools/latency_latest.py` 와 같음).
+   - 다음: 카메라 PC 에서 `vcan0` + `canoe_sim.py` 로 1단계 확인 → 실제 CAN → `run_matrix.sh` → CANoe 로그로 `analyze.py`. 상세는 `can_canoe/README.md`, 기록은 `PROGRESS.md` 2026-10-06.
+   - CAN 어댑터 종류·CANoe PC 의 Vector 장비는 미확인 (`--interface` 값이 달라짐).
+
 **A. 신호등 YOLO11n 재학습 (RTX 4080 PC, 2026-10-01 결정)** — 11s(21.4 GFLOPs, 칩 9.75 FPS)가 과도해서 n(6.5 GFLOPs)으로 비교.
    공개된 YOLO11n 신호등 모델은 없음 (HuggingFace 검색: 빈 저장소·보행자용 v8n 뿐) → 같은 데이터로 재학습.
 ```bash
