@@ -148,6 +148,7 @@ def main(argv=None):
     ap.add_argument("--data-bitrate", type=int, default=2000000, help="--fd 일 때 데이터 구간 속도")
     ap.add_argument("--fd-frames", action="store_true", help="메시지를 CAN FD 프레임(BRS 켬)으로 보냄. 안 주면 클래식 프레임")
     ap.add_argument("--max-dets", type=int, default=8)
+    ap.add_argument("--edge-wait", type=float, default=0.0)
     ap.add_argument("--nic", default="", help="OAK-D 가 꽂힌 이더넷 이름(예: enp5s0). 있으면 실제 수신 바이트를 잰다")
     ap.add_argument("--save-every", type=float, default=1.0, help="--raw on 일 때 이미지 저장 간격(초)")
     ap.add_argument("--fake", action="store_true", help="카메라 없이 가짜 입력 (검증용)")
@@ -199,7 +200,7 @@ def main(argv=None):
             gap = f["seq"] - prev_seq - 1 if prev_seq is not None else 0
             dropped += max(gap, 0)
             prev_seq = f["seq"]
-            source.wait_edge(f["seq"])
+            source.wait_edge(f["seq"], a.edge_wait)
             edge = source.edge_by_seq.get(f["seq"], 0)
             f["t_send"] = time.time()
             send(frame_status(f["seq"], len(f["dets"]), fps, edge, min(max(gap, 0), 15), MODEL_IDS[a.model], a.raw == "on"))

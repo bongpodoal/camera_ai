@@ -178,6 +178,8 @@ def main(argv=None):
     ap.add_argument("--data-bitrate", type=int, default=2000000, help="--fd 일 때 데이터 구간 속도")
     ap.add_argument("--fd-frames", action="store_true", help="메시지를 CAN FD 프레임(BRS 켬)으로 보냄. 안 주면 클래식 프레임")
     ap.add_argument("--max-dets", type=int, default=8)
+    ap.add_argument("--edge-wait", type=float, default=0.0,
+                    help="칩 지연값(EdgeMs)이 늦게 온 프레임을 최대 이 시간(초) 기다렸다 보낸다. 기본 0 = 기다리지 않음 (기다리면 그 프레임 송신이 약 20 ms 늦어 간격 지터가 생김, 안 기다리면 늦은 프레임의 EdgeMs 는 0 = 값 없음)")
     ap.add_argument("--nic", default="", help="OAK-D 가 꽂힌 이더넷 이름(예: enp5s0). 있으면 실제 수신 바이트를 잰다")
     ap.add_argument("--save-every", type=float, default=1.0, help="--raw on 일 때 이미지 저장 간격(초)")
     ap.add_argument("--fake", action="store_true", help="카메라 없이 가짜 입력 (검증용)")
@@ -229,7 +231,7 @@ def main(argv=None):
             gap = f["seq"] - prev_seq - 1 if prev_seq is not None else 0
             dropped += max(gap, 0)
             prev_seq = f["seq"]
-            source.wait_edge(f["seq"])      # 칩 지연값이 늦게 오는 시작 직후 프레임을 위해 최대 0.25초 기다림
+            source.wait_edge(f["seq"], a.edge_wait)      # 기본 0: 안 기다림 (송신 간격 지터 방지)
             edge = source.edge_by_seq.get(f["seq"], 0)      # 끝내 없으면 0 = 값 없음 (분석에서 제외)
             # CAN 송신: 프레임 요약 1개 + 검출 박스 (신뢰도 높은 순)
             f["t_send"] = time.time()
