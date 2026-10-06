@@ -1,0 +1,27 @@
+{
+ "start_wallclock": "2026-10-06T22:31:20.702",
+ "interface": "vector",
+ "channel": "0",
+ "bitrate": 500000,
+ "fd": false,
+ "python_can": "4.6.1",
+ "first_frame_wallclock": "2026-10-06T22:32:33.242",
+ "end_wallclock": "2026-10-06T22:33:19.422",
+ "counts": {
+  "0x300": 92,
+  "0x320": 16,
+  "0x310": 4
+ },
+ "definitions": {
+  "t_axis_ms": "첫 프레임 = 0, VN1630A 수신 시각, 정수 ms",
+  "fps_rx": "(0x300 개수 - 1) / (첫~마지막 0x300 시각). 송신 시작 지연은 빠짐. 카메라 쪽 fps_avg 는 시작 지연이 섞여 더 낮게 나올 수 있음",
+  "fps_10s": "실행 시작부터 꽉 찬 10초 구간별 fps (구간이 없으면 빈 칸)",
+  "seq_missing": "Seq 가 건너뛴 개수 = CAN 으로 잃은 프레임 수 (카메라가 못 준 것은 포함 안 됨)",
+  "edge_ms": "EdgeMs 가 0 인 프레임(시작 직후 값 없음) 제외한 중앙값, 0 이었던 프레임 수는 edge_zero_frames",
+  "pc_ms_post_ms_eth_KBps": "PERF 의 중앙값, 실행의 첫 PERF 는 워밍업이라 제외 (PERF 가 3개 이하면 전부 사용)",
+  "interval_ms_skip2": "첫 2프레임 이후 간격만의 통계",
+  "can_load_pct_rx": "수신 개수 x 135비트 / 구간 / 비트레이트 (최악 근사)",
+  "t_start_wall_iso": "실행 시작의 절대 시각 = 첫 프레임 절대 시각 + t_start_ms",
+  "gap_before_s": "앞 실행의 마지막 프레임부터 이 실행의 첫 프레임까지 (카메라 재시작 대기 등)"
+ }
+}

@@ -28,6 +28,7 @@ OAK-D --이더넷--> 카메라 PC (can_demo.py) --CAN 500 kbps--> CANoe PC (받�
 | `can_demo.py` (+`_no_comments`) | 카메라 → CAN 송신, 실행 기록 (`frames.csv`, `detections.csv`, `summary.csv`, `images/`) |
 | `analyze.py` (+`_no_comments`) | CANoe 로그 + 실행 기록 → 시간축·드리프트·비교표 |
 | `canoe_sim.py` | CANoe 흉내 (로그 저장). CANoe 없는 곳에서 시험용 |
+| `canoe_logger.py` (+`_no_comments`) | **Windows 노트북 수신 로거** (CANoe 없이 측정용). `canoe.asc` 저장 → `FRAME_STATUS/DET_BOX/PERF.csv`(t_axis_ms) · `runs_summary.csv/md`(실행별 FPS·결번·지연·박스 수·CAN 부하). 실행 구분은 analyze.py 와 같은 규칙. `--idle-exit N` 으로 자동 종료, `--summarize DIR` 로 표 재생성 |
 | `selftest.py` | 카메라·CANoe 없이 전체 흐름 검증 |
 | `run_matrix.sh` | 6번 측정을 한 번에 |
 

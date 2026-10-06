@@ -122,3 +122,15 @@ CAN으로 받을 수 있는지 확인하고, 파라미터 50개 이상을 추출
 | 수정 | `can_demo.py`(+`_no_comments`): duration 을 첫 프레임부터, `startup_s` 기록, EdgeMs 대기(0.25초). Kvaser 가상 채널 송수신: EdgeMs 0 프레임 101개 중 0개, selftest 통과 |
 | 점검 | Windows 로거 피드백: 타임스탬프 출처(VN1630A 하드웨어), 절대시각 meta, 드리프트는 5분 이상 필요. 이 노트북에 CANoe 미설치 → 대체 로거 사용 명시 또는 CANoe PC 에서 1회 필요 (사용자 결정 대기) |
 | 다음 | 사용자 지시 시: Raw 켬 60초 확인 → DURATION=300 으로 6회 (약 40분) |
+
+## 2026-10-06 (추가 6) — Windows 노트북 수신 확인 · 로거 구성
+
+| 항목 | 내용 |
+|---|---|
+| 노트북 | Git 2.55 · python-can 4.6.1 · cantools 설치. VN1630A 인식 (s/n 60643, 채널 1·2). CANoe 는 설치 안 됨 → Python 로거로 대체 |
+| 실수신 | Kvaser Leaf v3 → VN1630A ch1, 클래식 500 kbps. `--fake` 257프레임, 실카메라 yolov6n raw off 255프레임 (5.0 fps, 결번 0, 박스 93/93), DBC 해석 실패 0 |
+| 로거 | `can_canoe/canoe_logger.py` (+`_no_comments`): `canoe.asc` + 메시지별 CSV(t_axis_ms) + `runs_summary` + `meta.json`. 저장 기본값 바탕화면 `can_logs\<날짜_시각>`. `--idle-exit`/`STOP` 종료, `--summarize` 재생성 |
+| 시간축 | 타임스탬프 = VN1630A 하드웨어 수신 시각 (python-can vector, Vector XL 드라이버 `timeStamp`). 절대 시각 기준점만 버스를 연 순간의 PC 시계. `meta.json` 의 `timestamp_source` 에 기록 |
+| 피드백 반영 | `EdgeMs=0` 제외, 첫 PERF 제외, 첫 2프레임 제외 간격, `fps_10s`, ID별 개수, 클래스 이름, `gap_before_s`·`t_start_wall_iso`, `definitions`. `meta.json` 을 UTF-8 로 통일(한글로 요약이 죽던 버그) |
+| 시험 | 가상 버스 다실행 분리·결번 검출, 실측 2건 재요약 (`results/can_canoe/20261006/logs/`) |
+| 미확인 | 6회·5분 실측, 실제 CANoe 가 만든 .asc, 로거의 `--raw on` 실카메라 경로, 실제 VN1630A 경로의 새 `meta.json` 항목 |
