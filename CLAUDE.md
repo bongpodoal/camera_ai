@@ -1,7 +1,7 @@
 # camera_ai — 작업 메모리 (다른 컴퓨터에서 이어서 작업하기 위한 파일)
 
 Claude Code는 이 파일을 자동으로 읽는다. 사람도 이 파일 하나로 맥락을 잡을 수 있게 쓴다.
-마지막 갱신: 2026-10-01.
+마지막 갱신: 2026-10-06.
 
 ## 1. 프로젝트가 무엇인가
 
@@ -66,6 +66,17 @@ YOLOv8n 예제(T7 외장하드 `camera_ai/*/yolov8n/`, 실카메라 검증 19 FP
    - CANoe 가 막힐 때 대안(미검증): 노트북에서 `canoe_sim.py --interface vector --channel 0 --fd --out canoe.asc` (Python + Vector 드라이버만).
    - 순서: ① Windows CANoe 측정 시작(FD 500k/2M, `oakd_canoe_fd.dbc` 추가, Logging .asc) ② 카메라 PC `ip link set can0 up type can bitrate 500000 sample-point 0.8 dbitrate 2000000 dsample-point 0.8 fd on` ③ `can_demo.py --fake --fd --fd-frames` 로 Trace 확인 ④ 실제 카메라 1모델 60초 ⑤ `run_matrix.sh` ⑥ 로그를 옮겨 `analyze.py`. **실제 CANoe 가 만든 .asc 를 analyze.py 가 읽는지 미확인** (안 읽히면 analyze.py 의 read_log 를 로그 형식에 맞출 것).
 
+**현재 해야 할 일 요약 (2026-10-06 갱신, 순서대로):**
+
+| # | 작업 | 어디서 | 상태 |
+|---|---|---|---|
+| 1 | CAN 과제 1단계: `vcan0` + `canoe_sim.py` 로 실카메라 경로 확인 (특히 `--raw off` 칩 Script) | 카메라 PC | 미착수 |
+| 2 | **카메라 PC 의 socketcan FD 어댑터 모델** 확인·준비 (이 PC 엔 `can0` 없음, 2026-10-06 확인). Vector 는 VN1630A (Windows 노트북, COM2) 로 확인됨, VN1630A 의 FD 지원은 데이터시트 확인 | 사용자 확인 | 어댑터 미확인 |
+| 3 | 노트북 CANoe 설정(FD 500k/2M, `oakd_canoe_fd.dbc`, .asc 로깅) → `can_demo.py --fake --fd --fd-frames` 로 Trace 확인 → 카메라 1모델 60초 → `run_matrix.sh` 6회 실측(기본 FD) → `analyze.py` (실제 .asc 읽기 미확인, 안 되면 `read_log` 수정) | 카메라 PC + Windows 노트북 | 미착수 |
+| 4 | 5 fps 최신화 큐 5분 지연 측정 (`run_latest_3models.sh`) | 카메라 PC | 준비 완료 |
+| 5 | 신호등 YOLO11n 재학습 (아래 A) | RTX 4080 PC | 미착수 |
+| 6 | 인식률(정답 비교) 테스트 | — | 보류, 나중에 논의 |
+
 **A. 신호등 YOLO11n 재학습 (RTX 4080 PC, 2026-10-01 결정)** — 11s(21.4 GFLOPs, 칩 9.75 FPS)가 과도해서 n(6.5 GFLOPs)으로 비교.
    공개된 YOLO11n 신호등 모델은 없음 (HuggingFace 검색: 빈 저장소·보행자용 v8n 뿐) → 같은 데이터로 재학습.
 ```bash
@@ -91,7 +102,7 @@ python3 02_onnx/export_onnx.py 416x416 traffic_light_11n     # ③ convert_ir ·
    지연 821 ms 는 **칩 안(엣지)에서 생김** (2026-09-29 분해 측정, 6절). 카메라 FPS를 AI 속도(≈10)에 맞춰 줄어드는지 확인.
 1. ④ superblob에서 기본 블롭(SHAVE 8) 떼어 `04_blob/`에 저장 — 바로 가능
 2. ⑦ 실제 카메라 **5분** 본 기록 → `review.py summary`로 파라미터 50개 이상 확인
-3. ⑦ CAN: `vcan0`(sudo 필요) → USB-CAN 어댑터 (이 PC에는 어댑터 없음)
+3. ⑦ CAN: `can_canoe/` 새 과제로 대체됨 (위 ★ 항목). 기존 `can_bridge.py` 는 vcan0 시험용으로만 남음
 4. ① YOLOv6 "R2" 원본 출처 확인 → ② 로컬 ONNX 변환(luxonis/tools) 후 예제와 비교
 5. ③ IR은 OpenVINO 2022.3 필요 → Python 3.10 환경 별도 필요 (3.12용은 MYRIAD 미지원)
 6. ⑥ 실행 시 실제 SHAVE 배분 확인
@@ -131,6 +142,9 @@ nmcli connection up oak-poe && ping -c 2 169.254.1.222
 - 종료 시 크래시 덤프가 자주 남는다(`~/.cache/depthai/crashdumps/`). 종료 전 큐를 비운다. 연속 실행 때 다음 실행이 `Device already closed` 로 실패하면 30초 더 기다린다.
 - **두 번째 PC (2026-09-29, 이더넷 `enp5s0`):** 자동 연결 프로필 `Wired connection 4` 가 링크 끊김 때 가로챈다. 연속 측정 동안만
   `nmcli connection modify oak-poe connection.autoconnect yes connection.autoconnect-priority 100` → 끝나면 `no` / `0` 으로 되돌린다.
+  **2026-10-01:** 카메라 선이 `enp6s0` 로 바뀜 (`Wired connection 3` 이 가로챔). `oak-poe` 를 `enp6s0` 에 묶고 autoconnect yes / 우선순위 100 으로 **상시** 켜 둠.
+  T7 에서 git 제외 파일(yolov8n·신호등 416 NNArchive, superblob)을 `~/camera_ai` 로 복사 → 이 PC 는 T7 없이 `~/camera_ai/tools` 에서 바로 실행.
+  5 fps 최신화 큐 10초 확인: 총 지연 v6n 75 · v8n 89 · 신호등 11s 160 ms (예상 범위 안).
   시스템 depthai 는 2.30(다른 프로젝트용) → 이 저장소는 venv `~/venvs/camera_ai` (depthai 3.10, Python 3.10) 로 실행.
 - **칩 Script 노드 함정:** Script 안에서 `msg.getTimestamp()` 를 부르면 펌웨어 크래시. 칩 시계끼리(`Clock.now()`, `getTimestampDevice()`) 뺀다.
   `Buffer.setData()` 는 list 가 아니라 bytes 를 받는다 (list 면 TypeError 로 Script 가 멈춤).
