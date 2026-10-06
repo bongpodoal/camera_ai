@@ -151,7 +151,8 @@ def main(argv=None):
     if a.fd and a.interface != "virtual":
         kw.update(fd=True, data_bitrate=a.data_bitrate)
     set_fd_frames(a.fd_frames)
-    bus = can.Bus(interface=a.interface, channel=a.channel, **kw)
+    channel = int(a.channel) if a.channel.isdigit() else a.channel
+    bus = can.Bus(interface=a.interface, channel=channel, **kw)
     source = FakeSource(a) if a.fake else OakSource(a)
     stop = threading.Event()
 

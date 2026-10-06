@@ -80,3 +80,12 @@ CAN으로 받을 수 있는지 확인하고, 파라미터 50개 이상을 추출
 | Vector | 드라이버·python-can `vector` 가 Windows 전용 (검색 근거) → Windows 쪽에 연결 |
 | CAN FD | 선택. `--fd`, `--data-bitrate`, `--fd-frames`, `oakd_canoe_fd.dbc` 추가. 맥 selftest 에서 FD 프레임 로그·분석 통과. 실장비 미확인 |
 | 다음 | Ubuntu PC 에서 `can_canoe/README.md` 순서대로 (vcan0 → 실제 CAN → 6회 실측) |
+
+## 2026-10-06 (추가 2) — 장비 확정: Windows 노트북 + Vector VN1630A, CAN FD
+
+| 항목 | 내용 |
+|---|---|
+| 구조 | 카메라 PC(Ubuntu) → CAN FD → Windows 노트북(VN1630A, CANoe 로깅) |
+| FD 설정 | 500 kbps / 2 Mbps / 샘플 포인트 80%. `run_matrix.sh` 기본이 FD, DBC 는 `oakd_canoe_fd.dbc` |
+| 코드 | vector 채널 번호(정수) 처리, `canoe_sim.py --app-name`. 맥 selftest 통과 (가상 버스) |
+| 미확인 | 카메라 PC 의 FD 어댑터 모델, VN1630A 의 FD 지원(데이터시트), 실제 CANoe 로그 읽기, 실제 카메라 경로 |

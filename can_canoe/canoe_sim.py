@@ -29,12 +29,16 @@ if __name__ == "__main__":
     ap.add_argument("--bitrate", type=int, default=500000)
     ap.add_argument("--fd", action="store_true")
     ap.add_argument("--data-bitrate", type=int, default=2000000)
+    ap.add_argument("--app-name", help="vector 전용: Vector Hardware Config 에 등록한 응용 이름")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     kw = {} if a.interface == "virtual" else {"bitrate": a.bitrate}
     if a.fd and a.interface != "virtual":
         kw.update(fd=True, data_bitrate=a.data_bitrate)
-    sim = CanoeSim(can.Bus(interface=a.interface, channel=a.channel, **kw), a.out)
+    if a.app_name:
+        kw["app_name"] = a.app_name
+    channel = int(a.channel) if a.channel.isdigit() else a.channel
+    sim = CanoeSim(can.Bus(interface=a.interface, channel=channel, **kw), a.out)
     try:
         while True:
             time.sleep(1)

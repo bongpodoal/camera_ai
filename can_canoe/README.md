@@ -38,30 +38,50 @@ OAK-D --이더넷--> 카메라 PC (can_demo.py) --CAN 500 kbps--> CANoe PC (받�
 4. Trace 창에 FRAME_STATUS 등이 이름·값으로 보이는지 확인한다.
 5. Logging 블록을 켜고 저장 형식을 `.asc` (또는 `.blf`) 로 한다. **측정 시작 → run_matrix.sh 실행 → 끝나면 측정 중지** 순서.
 
-## CAN 어댑터와 CAN FD (2026-10-06 정리)
+## 확정 구조 (2026-10-06): 카메라 PC → CAN FD → Windows 노트북 (Vector VN1630A + CANoe)
+```
+OAK-D ─이더넷→ Ubuntu 22.04.5 (can_demo.py) ─ FD 어댑터 ──CAN_H/CAN_L, 양 끝 120 Ω── Vector VN1630A ─ Windows 노트북 (CANoe 로깅)
+```
 | 항목 | 내용 |
 |---|---|
-| Vector 어댑터 | 드라이버(XL Driver Library)가 **Windows 전용**이고 python-can 의 `vector` 인터페이스도 Windows 만 지원 (검색 결과 기준, Linux 지원 여부는 Vector 문서로 재확인 필요). → **Vector 는 CANoe PC(Windows) 쪽에 두는 것이 안전** |
-| 카메라 PC (Ubuntu 22.04.5) | 송신용으로 **socketcan 이 되는 FD 어댑터**가 따로 필요 (예: PEAK PCAN-USB FD 등). 어떤 어댑터를 쓰는지 미확인 |
-| 카메라 PC 를 Windows 로 | depthai 는 Windows 에서도 되고 `--interface vector` 로 보낼 수 있음. 다만 같은 Vector 채널을 CANoe 와 동시에 쓰는 구성은 확인 못 함 |
-| CAN FD 모드 | 버스를 FD 로 열고(`--fd --data-bitrate 2000000`), CANoe 채널의 중재 속도(500k)·데이터 속도(2M)와 **같아야** 함 |
-| 프레임 형식 | 기본은 클래식 8바이트 프레임(FD 버스에서도 통용). `--fd-frames` 를 주면 같은 8바이트를 FD 프레임(BRS)으로 보냄. 이때는 `oakd_canoe_fd.dbc` 를 CANoe 에 사용 |
-| 아직 안 한 것 | FD 의 64바이트 활용(한 프레임에 박스 여러 개 묶기)은 구현 안 함 |
+| 속도 | 중재 구간 **500 kbps**, 데이터 구간 **2 Mbps**, 샘플 포인트 약 80% (두 쪽이 같아야 함) |
+| 프레임 | `--fd-frames` (같은 8바이트를 CAN FD 프레임·BRS 로 보냄). CANoe 에는 **`oakd_canoe_fd.dbc`** 를 추가 |
+| Vector VN1630A | Windows 에서만 동작 (드라이버·python-can `vector`). VN1600 계열은 CAN FD 지원으로 알고 있으나 **VN1630A 의 FD 지원은 데이터시트로 최종 확인 필요** |
+| 카메라 PC 어댑터 | **socketcan 이 되는 FD 어댑터가 필요** (예: PEAK PCAN-USB FD). 모델 미확인 |
+| 시간축 | Windows 노트북(Vector 하드웨어)이 프레임을 받은 시각 |
 
-Ubuntu 에서 FD 어댑터 켜기 (socketcan):
+Ubuntu 쪽 (FD 켜기):
 ```bash
-sudo ip link set can0 up type can bitrate 500000 dbitrate 2000000 fd on
+sudo ip link set can0 up type can bitrate 500000 sample-point 0.8 dbitrate 2000000 dsample-point 0.8 fd on
+ip -details link show can0        # fd on, 속도 확인
 ```
+Windows 노트북 (CANoe 19) — 메뉴 이름은 버전에 따라 다를 수 있음:
+1. Vector Hardware Config 에서 VN1630A 의 채널 하나를 CANoe 의 CAN 1 채널에 할당한다.
+2. CANoe 의 해당 CAN 채널을 **CAN FD 모드**로 두고 중재 500 kbps · 데이터 2000 kbps, 샘플 포인트 80% 로 맞춘다.
+3. 데이터베이스에 `oakd_canoe_fd.dbc` 추가 → Trace 창 확인 → Logging 블록으로 `.asc` 저장.
+4. **측정 시작 후** Ubuntu 에서 `can_demo.py` 실행.
+
+CANoe 가 막히면 대안 (**미검증**): Windows 노트북에 Python 과 Vector 드라이버만 설치하고 CANoe 없이 받기.
+```bash
+pip install python-can cantools numpy
+python canoe_sim.py --interface vector --channel 0 --fd --data-bitrate 2000000 --out canoe.asc
+```
+(채널 번호는 Vector Hardware Config 의 응용 채널 할당을 따르고, 필요하면 `--app-name` 으로 응용 이름을 지정)
+
+| 아직 안 한 것 | |
+|---|---|
+| FD 64바이트 활용 | 한 프레임에 박스 여러 개 묶기 — 구현 안 함 |
+| 실장비 시험 | 모든 CAN 경로가 맥의 가상 버스에서만 확인됨 |
 
 ## 카메라 PC 쪽
 ```bash
-sudo ip link set can0 up type can bitrate 500000        # PCAN 등 socketcan 어댑터일 때
+sudo ip link set can0 up type can bitrate 500000 sample-point 0.8 dbitrate 2000000 dsample-point 0.8 fd on   # FD (클래식이면 'bitrate 500000' 만, 이때 run_matrix.sh 는 FD=0)
 cd can_canoe
 NIC=<이더넷이름> V8_ARCHIVE=<T7의 yolov8n NNArchive> bash run_matrix.sh
 # CANoe 로그를 가져온 뒤
 python3 analyze.py --log canoe.asc --runs-root runs/<날짜_시각>
 ```
-Vector 어댑터면 `INTERFACE=vector CHANNEL=0` 같이 지정한다 (python-can 의 vector 드라이버, 설정은 어댑터에 따라 다름).
+run_matrix.sh 는 기본이 CAN FD (FD=1, FD_FRAMES=1) 다. 클래식으로 하려면 `FD=0 FD_FRAMES=0`.
 
 ## 시간축이 이렇게 정해진다
 | 값 | 무엇의 시계 | 용도 |
