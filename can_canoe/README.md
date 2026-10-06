@@ -22,7 +22,8 @@ OAK-D --이더넷--> 카메라 PC (can_demo.py) --CAN 500 kbps--> CANoe PC (받�
 
 | 파일 | 역할 |
 |---|---|
-| `oakd_canoe.dbc` | 메시지 정의 FRAME_STATUS 0x300 · DET_BOX 0x310 · PERF 0x320 (클래식 CAN, ASCII 만) |
+| `oakd_canoe.dbc` | 메시지 정의 FRAME_STATUS 0x300 · DET_BOX 0x310 · PERF 0x320 (클래식 프레임, ASCII 만) |
+| `oakd_canoe_fd.dbc` | 같은 내용, 프레임 형식만 CAN FD (`--fd-frames` 로 보낼 때 사용) |
 | `can_msgs.py` | 인코딩/디코딩 |
 | `can_demo.py` (+`_no_comments`) | 카메라 → CAN 송신, 실행 기록 (`frames.csv`, `detections.csv`, `summary.csv`, `images/`) |
 | `analyze.py` (+`_no_comments`) | CANoe 로그 + 실행 기록 → 시간축·드리프트·비교표 |
@@ -36,6 +37,21 @@ OAK-D --이더넷--> 카메라 PC (can_demo.py) --CAN 500 kbps--> CANoe PC (받�
 3. CAN 채널 속도를 **500 kbps** 로, 카메라 PC 의 CAN 어댑터와 CAN_H/CAN_L 을 잇는다 (양 끝 120 Ω 종단).
 4. Trace 창에 FRAME_STATUS 등이 이름·값으로 보이는지 확인한다.
 5. Logging 블록을 켜고 저장 형식을 `.asc` (또는 `.blf`) 로 한다. **측정 시작 → run_matrix.sh 실행 → 끝나면 측정 중지** 순서.
+
+## CAN 어댑터와 CAN FD (2026-10-06 정리)
+| 항목 | 내용 |
+|---|---|
+| Vector 어댑터 | 드라이버(XL Driver Library)가 **Windows 전용**이고 python-can 의 `vector` 인터페이스도 Windows 만 지원 (검색 결과 기준, Linux 지원 여부는 Vector 문서로 재확인 필요). → **Vector 는 CANoe PC(Windows) 쪽에 두는 것이 안전** |
+| 카메라 PC (Ubuntu 22.04.5) | 송신용으로 **socketcan 이 되는 FD 어댑터**가 따로 필요 (예: PEAK PCAN-USB FD 등). 어떤 어댑터를 쓰는지 미확인 |
+| 카메라 PC 를 Windows 로 | depthai 는 Windows 에서도 되고 `--interface vector` 로 보낼 수 있음. 다만 같은 Vector 채널을 CANoe 와 동시에 쓰는 구성은 확인 못 함 |
+| CAN FD 모드 | 버스를 FD 로 열고(`--fd --data-bitrate 2000000`), CANoe 채널의 중재 속도(500k)·데이터 속도(2M)와 **같아야** 함 |
+| 프레임 형식 | 기본은 클래식 8바이트 프레임(FD 버스에서도 통용). `--fd-frames` 를 주면 같은 8바이트를 FD 프레임(BRS)으로 보냄. 이때는 `oakd_canoe_fd.dbc` 를 CANoe 에 사용 |
+| 아직 안 한 것 | FD 의 64바이트 활용(한 프레임에 박스 여러 개 묶기)은 구현 안 함 |
+
+Ubuntu 에서 FD 어댑터 켜기 (socketcan):
+```bash
+sudo ip link set can0 up type can bitrate 500000 dbitrate 2000000 fd on
+```
 
 ## 카메라 PC 쪽
 ```bash

@@ -71,3 +71,12 @@ CAN으로 받을 수 있는지 확인하고, 파라미터 50개 이상을 추출
 | 검증 | 맥에서 `selftest.py` 통과 (가상 CAN, 4번 실행을 한 로그에서 분리·짝짓기, ppm 복원, 시간축 정수 ms) |
 | 미검증 | 실제 카메라 경로, 실제 CANoe 의 DBC 로드·로그 읽기, 6회 실측 |
 | 보류 | 인식률(정답 비교) 테스트 — 합성 영상·LISA·AI Hub 후보, 나중에 논의 |
+
+## 2026-10-06 (추가) — 장비 구조 확정, CAN FD 옵션
+
+| 항목 | 내용 |
+|---|---|
+| 구조 | 카메라 PC(Ubuntu 22.04.5) → CAN → Windows PC(CANoe, Vector 어댑터) 로깅 |
+| Vector | 드라이버·python-can `vector` 가 Windows 전용 (검색 근거) → Windows 쪽에 연결 |
+| CAN FD | 선택. `--fd`, `--data-bitrate`, `--fd-frames`, `oakd_canoe_fd.dbc` 추가. 맥 selftest 에서 FD 프레임 로그·분석 통과. 실장비 미확인 |
+| 다음 | Ubuntu PC 에서 `can_canoe/README.md` 순서대로 (vcan0 → 실제 CAN → 6회 실측) |

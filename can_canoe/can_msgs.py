@@ -17,6 +17,15 @@ MODEL_NAMES = {v: k for k, v in MODEL_IDS.items()}
 BITS_PER_FRAME = 135        # 11비트 ID + 8바이트 데이터, 비트 스터핑 최악 근사
 
 
+FD_FRAMES = False     # True 면 같은 8바이트 내용을 CAN FD 프레임(전송 속도 전환 BRS 켬)으로 보낸다
+FD_BRS = True
+
+
+def set_fd_frames(on, brs=True):
+    global FD_FRAMES, FD_BRS
+    FD_FRAMES, FD_BRS = on, brs
+
+
 def _msg(name, values):
     """신호 범위를 넘는 값은 잘라서(clamp) CAN 프레임으로 만든다."""
     m = MSG[name]
@@ -24,7 +33,8 @@ def _msg(name, values):
     for s in m.signals:
         v = float(values.get(s.name, 0) or 0)
         out[s.name] = min(max(v, s.minimum), s.maximum)
-    return can.Message(arbitration_id=m.frame_id, is_extended_id=False, data=m.encode(out, strict=False))
+    return can.Message(arbitration_id=m.frame_id, is_extended_id=False, data=m.encode(out, strict=False),
+                       is_fd=FD_FRAMES, bitrate_switch=FD_FRAMES and FD_BRS)
 
 
 def frame_status(seq, det_count, fps, edge_ms, seq_gap, model_id, raw_on):

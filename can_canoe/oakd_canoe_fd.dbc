@@ -1,0 +1,76 @@
+VERSION "1.0"
+
+
+NS_ :
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	BA_DEF_DEF_
+	BA_DEF_DEF_REL_
+	SIG_VALTYPE_
+
+BS_:
+
+BU_: CAM_PC CANOE
+
+
+BO_ 768 FRAME_STATUS: 8 CAM_PC
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" CANOE
+ SG_ DetCount : 16|8@1+ (1,0) [0|255] "" CANOE
+ SG_ Fps : 24|16@1+ (0.1,0) [0|6553.5] "fps" CANOE
+ SG_ EdgeMs : 40|12@1+ (1,0) [0|4095] "ms" CANOE
+ SG_ SeqGap : 52|4@1+ (1,0) [0|15] "" CANOE
+ SG_ ModelId : 56|4@1+ (1,0) [0|15] "" CANOE
+ SG_ RawOn : 60|1@1+ (1,0) [0|1] "" CANOE
+
+BO_ 784 DET_BOX: 8 CAM_PC
+ SG_ SeqLo : 0|4@1+ (1,0) [0|15] "" CANOE
+ SG_ Index : 4|4@1+ (1,0) [0|15] "" CANOE
+ SG_ Label : 8|7@1+ (1,0) [0|127] "" CANOE
+ SG_ Conf : 15|7@1+ (0.01,0) [0|1.27] "" CANOE
+ SG_ Cx : 22|10@1+ (0.001,0) [0|1.023] "" CANOE
+ SG_ Cy : 32|10@1+ (0.001,0) [0|1.023] "" CANOE
+ SG_ W : 42|10@1+ (0.001,0) [0|1.023] "" CANOE
+ SG_ H : 52|10@1+ (0.001,0) [0|1.023] "" CANOE
+
+BO_ 800 PERF: 8 CAM_PC
+ SG_ PcMs : 0|12@1+ (0.1,0) [0|409.5] "ms" CANOE
+ SG_ PostMs : 12|12@1+ (0.1,0) [0|409.5] "ms" CANOE
+ SG_ EthKBps : 24|16@1+ (1,0) [0|65535] "KB/s" CANOE
+ SG_ CanLoadPct : 40|8@1+ (0.5,0) [0|127.5] "%" CANOE
+ SG_ DroppedTotal : 48|16@1+ (1,0) [0|65535] "" CANOE
+
+
+
+CM_ BU_ CAM_PC "PC that reads the OAK-D over Ethernet and sends the results on CAN.";
+CM_ BU_ CANOE "CANoe. Its trace time stamp is the single time axis.";
+CM_ BO_ 768 "One per processed camera frame. Seq links this frame to DET_BOX (SeqLo) and to the PC log frames.csv.";
+CM_ BO_ 784 "One per detection, top N by confidence, Index 0 = highest. Box center and size normalized 0..1.";
+CM_ BO_ 800 "Performance summary, once per second.";
+CM_ SG_ 768 Seq "Camera frame sequence number modulo 65536.";
+CM_ SG_ 768 Fps "Chip processing rate over the last second.";
+CM_ SG_ 768 EdgeMs "Latency inside the camera chip (chip clock minus chip clock, no drift). Not a time axis.";
+CM_ SG_ 768 SeqGap "Frames skipped since the previous message, saturates at 15.";
+CM_ SG_ 768 ModelId "0=yolov6n 1=yolov8n 2=traffic_light 3=traffic_light_11n";
+CM_ SG_ 768 RawOn "0=only detection results are received, 1=raw image is also received over Ethernet";
+CM_ SG_ 784 SeqLo "Low 4 bits of FRAME_STATUS.Seq.";
+CM_ SG_ 784 Label "Class number. traffic_light models: 0=red 1=yellow 2=green 3=off. COCO models: COCO class index.";
+CM_ SG_ 784 Conf "Confidence 0..1 as reported by the camera. This is not an accuracy.";
+CM_ SG_ 800 PcMs "PC side latency median over the last second (Ethernet, queue, processing).";
+CM_ SG_ 800 PostMs "Time to draw boxes on the raw image. 0 when RawOn=0.";
+CM_ SG_ 800 EthKBps "Bytes received from the camera over Ethernet per second, in KB.";
+CM_ SG_ 800 CanLoadPct "Estimated CAN bus load, worst case bit stuffing.";
+CM_ SG_ 800 DroppedTotal "Total frames dropped by the camera input queue since start.";
+BA_DEF_ "BusType" STRING ;
+BA_DEF_ BO_ "GenMsgCycleTime" INT 0 65535;
+BA_DEF_ BO_ "VFrameFormat" ENUM "StandardCAN","ExtendedCAN","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","StandardCAN_FD","ExtendedCAN_FD";
+BA_DEF_DEF_ "BusType" "CAN";
+BA_DEF_DEF_ "GenMsgCycleTime" 0;
+BA_DEF_DEF_ "VFrameFormat" "StandardCAN";
+BA_ "BusType" "CAN";
+BA_ "GenMsgCycleTime" BO_ 800 1000;
+BA_ "VFrameFormat" BO_ 768 14;
+BA_ "VFrameFormat" BO_ 784 14;
+BA_ "VFrameFormat" BO_ 800 14;

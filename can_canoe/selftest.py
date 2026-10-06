@@ -22,7 +22,7 @@ plan = [("yolov6n", "off", 3000), ("yolov6n", "on", -2000), ("traffic_light", "o
 rc = []
 for i, (model, raw, ppm) in enumerate(plan, 1):
     rc.append(can_demo.main(["--fake", "--fake-ppm", str(ppm), "--model", model, "--raw", raw, "--fps", "10",
-                             "--duration", "12", "--interface", "virtual", "--channel", "selftest",
+                             "--duration", "12", *(["--fd-frames"] if i == 4 else []), "--interface", "virtual", "--channel", "selftest",
                              "--out-dir", str(root / f"{i}_{model}_{raw}")]))
 sim.stop()
 arc = analyze.main(["--log", str(log), "--runs-root", str(root)])
@@ -49,6 +49,8 @@ for c, (model, raw, ppm) in zip(cmp_rows, plan):
     check(f"{tag}: 시간축이 정수 ms 로 단조 증가", t[0] == 0 and all(b > a for a, b in zip(t, t[1:])))
 perf_n = sum(1 for m in can.LogReader(str(log)) if m.arbitration_id == 0x320)
 check(f"PERF 메시지가 로그에 있음 ({perf_n}개)", perf_n >= 8)
+fd_n = sum(1 for m in can.LogReader(str(log)) if getattr(m, "is_fd", False))
+check(f"FD 프레임이 로그에 있음 ({fd_n}개, 마지막 실행)", fd_n >= 100)
 check("compare.md 생성", (root / "compare.md").exists())
 print("결과:", "통과" if not fails else f"실패 {fails}")
 print((root / "compare.md").read_text())

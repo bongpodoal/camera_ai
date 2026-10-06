@@ -27,9 +27,13 @@ if __name__ == "__main__":
     ap.add_argument("--interface", default="socketcan")
     ap.add_argument("--channel", default="vcan0")
     ap.add_argument("--bitrate", type=int, default=500000)
+    ap.add_argument("--fd", action="store_true")
+    ap.add_argument("--data-bitrate", type=int, default=2000000)
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     kw = {} if a.interface == "virtual" else {"bitrate": a.bitrate}
+    if a.fd and a.interface != "virtual":
+        kw.update(fd=True, data_bitrate=a.data_bitrate)
     sim = CanoeSim(can.Bus(interface=a.interface, channel=a.channel, **kw), a.out)
     try:
         while True:

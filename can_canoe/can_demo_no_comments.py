@@ -9,7 +9,7 @@ from pathlib import Path
 
 import can
 
-from can_msgs import BITS_PER_FRAME, MODEL_IDS, det_box, frame_status, perf
+from can_msgs import BITS_PER_FRAME, MODEL_IDS, det_box, frame_status, perf, set_fd_frames
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVES = {
@@ -133,7 +133,10 @@ def main(argv=None):
     ap.add_argument("--archive", help="NNArchive 경로 직접 지정 (T7 에만 있는 yolov8n 등)")
     ap.add_argument("--interface", default="socketcan", help="socketcan | vector | pcan | virtual ...")
     ap.add_argument("--channel", default="can0")
-    ap.add_argument("--bitrate", type=int, default=500000)
+    ap.add_argument("--bitrate", type=int, default=500000, help="CAN 중재(기본) 속도")
+    ap.add_argument("--fd", action="store_true", help="버스를 CAN FD 모드로 연다 (CANoe 채널 설정과 같아야 함)")
+    ap.add_argument("--data-bitrate", type=int, default=2000000, help="--fd 일 때 데이터 구간 속도")
+    ap.add_argument("--fd-frames", action="store_true", help="메시지를 CAN FD 프레임(BRS 켬)으로 보냄. 안 주면 클래식 프레임")
     ap.add_argument("--max-dets", type=int, default=8)
     ap.add_argument("--nic", default="", help="OAK-D 가 꽂힌 이더넷 이름(예: enp5s0). 있으면 실제 수신 바이트를 잰다")
     ap.add_argument("--save-every", type=float, default=1.0, help="--raw on 일 때 이미지 저장 간격(초)")
@@ -145,6 +148,9 @@ def main(argv=None):
     out = Path(a.out_dir).expanduser()
     (out / "images").mkdir(parents=True, exist_ok=True)
     kw = {} if a.interface == "virtual" else {"bitrate": a.bitrate}
+    if a.fd and a.interface != "virtual":
+        kw.update(fd=True, data_bitrate=a.data_bitrate)
+    set_fd_frames(a.fd_frames)
     bus = can.Bus(interface=a.interface, channel=a.channel, **kw)
     source = FakeSource(a) if a.fake else OakSource(a)
     stop = threading.Event()

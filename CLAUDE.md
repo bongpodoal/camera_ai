@@ -61,7 +61,9 @@ YOLOv8n 예제(T7 외장하드 `camera_ai/*/yolov8n/`, 실카메라 검증 19 FP
    - 맥에서 `selftest.py` 통과. **미검증: 실제 카메라 경로(특히 `--raw off` 의 칩 위 버림 Script), 실제 CANoe 의 DBC 로드·로그 읽기, 6회 실측.**
    - 설정은 5 fps 고정 + AI 입력 큐 크기 1 비차단 (`tools/latency_latest.py` 와 같음).
    - 다음: 카메라 PC 에서 `vcan0` + `canoe_sim.py` 로 1단계 확인 → 실제 CAN → `run_matrix.sh` → CANoe 로그로 `analyze.py`. 상세는 `can_canoe/README.md`, 기록은 `PROGRESS.md` 2026-10-06.
-   - CAN 어댑터 종류·CANoe PC 의 Vector 장비는 미확인 (`--interface` 값이 달라짐).
+   - **2026-10-06 확정 구조:** 카메라(Ubuntu 22.04.5) → CAN → **Windows PC 의 CANoe 가 로깅**. Vector 어댑터는 Windows 쪽에 둠 (Vector 드라이버·python-can `vector` 는 Windows 전용). 카메라 PC 는 socketcan 어댑터로 송신 (모델 미확인).
+   - CAN FD 는 선택: 처음엔 **클래식 500 kbps** 로 (메시지 8바이트, 버스 부하 약 1%). FD 가 필요하면 `--fd --data-bitrate 2000000` (+ `--fd-frames` 와 `oakd_canoe_fd.dbc`), 이때 CANoe 채널·양쪽 어댑터가 모두 FD 지원이어야 함. FD 의 64바이트 활용은 미구현. Vector 모델명·과제의 FD 요구 여부 미확인.
+   - 순서: ① Windows CANoe 측정 시작(500 kbps, DBC 추가, Logging .asc) ② 카메라 PC `ip link set can0 up type can bitrate 500000` ③ `can_demo.py --fake` 로 Trace 확인 ④ 실제 카메라 1모델 60초 ⑤ `run_matrix.sh` ⑥ 로그를 옮겨 `analyze.py`. **실제 CANoe 가 만든 .asc 를 analyze.py 가 읽는지 미확인** (안 읽히면 analyze.py 의 read_log 를 로그 형식에 맞출 것).
 
 **A. 신호등 YOLO11n 재학습 (RTX 4080 PC, 2026-10-01 결정)** — 11s(21.4 GFLOPs, 칩 9.75 FPS)가 과도해서 n(6.5 GFLOPs)으로 비교.
    공개된 YOLO11n 신호등 모델은 없음 (HuggingFace 검색: 빈 저장소·보행자용 v8n 뿐) → 같은 데이터로 재학습.
