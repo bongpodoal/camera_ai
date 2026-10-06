@@ -63,6 +63,7 @@ def main(argv=None):
     ap.add_argument("--log", required=True)
     ap.add_argument("--runs-root", required=True)
     ap.add_argument("--bitrate", type=int, default=500000)
+    ap.add_argument("--warmup-s", type=float, default=3.0)
     a = ap.parse_args(argv)
     root = Path(a.runs_root).expanduser()
 
@@ -101,7 +102,8 @@ def main(argv=None):
         ts_arr = np.array([p[0] - ts0 for p in pairs])
         dev_arr = np.array([float(p[1]["dev_t_s"]) - dev0 for p in pairs])
         snd_arr = np.array([float(p[1]["t_send_s"]) - send0 for p in pairs])
-        cam_ppm, pc_ppm = slope_ppm(ts_arr, dev_arr), slope_ppm(ts_arr, snd_arr)
+        keep = ts_arr >= a.warmup_s
+        cam_ppm, pc_ppm = slope_ppm(ts_arr[keep], dev_arr[keep]), slope_ppm(ts_arr[keep], snd_arr[keep])
         t_axis = [round(t * 1000) for t in ts_arr]
         interval = np.diff(ts_arr) * 1000
         with open(d / "frames_axis.csv", "w", newline="") as fh:

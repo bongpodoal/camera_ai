@@ -8,7 +8,7 @@
     1) 로그의 FRAME_STATUS 를 모델·Raw 여부(ModelId, RawOn)가 바뀌는 곳, 또는 5초 넘게 끊긴 곳에서 잘라 실행별로 나눈다
     2) 실행 폴더(model, raw)와 짝지은 뒤 Seq 로 프레임을 하나씩 맞춘다
     3) 시간축 t_axis_ms = CANoe 가 받은 시각 (첫 프레임을 0 으로, 정수 ms)
-    4) 카메라 시계·PC 시계가 CANoe 시계에서 벌어지는 속도(ppm)를 직선 맞춤으로 잰다
+    4) 카메라 시계·PC 시계가 CANoe 시계에서 벌어지는 속도(ppm)를 직선 맞춤으로 잰다 (시작 후 --warmup-s 초(기본 3)는 제외)
     5) 비교표(compare.csv / compare.md)와 실행별 frames_axis.csv, 드리프트 그림(drift.png) 저장
 인식 지표는 정답 없이 낼 수 있는 것(검출 비율·평균 신뢰도·클래스별 개수)뿐이다. 인식률(정답 비교)이 아니다.
 """
@@ -86,6 +86,8 @@ def main(argv=None):
     ap.add_argument("--log", required=True)
     ap.add_argument("--runs-root", required=True)
     ap.add_argument("--bitrate", type=int, default=500000)
+    ap.add_argument("--warmup-s", type=float, default=3.0,
+                    help="드리프트(ppm) 직선 맞춤에서 실행 시작 후 이 시간(초)은 제외 (카메라 시작 직후 프레임 버스트 때문)")
     a = ap.parse_args(argv)
     root = Path(a.runs_root).expanduser()
 
@@ -125,7 +127,8 @@ def main(argv=None):
         ts_arr = np.array([p[0] - ts0 for p in pairs])
         dev_arr = np.array([float(p[1]["dev_t_s"]) - dev0 for p in pairs])
         snd_arr = np.array([float(p[1]["t_send_s"]) - send0 for p in pairs])
-        cam_ppm, pc_ppm = slope_ppm(ts_arr, dev_arr), slope_ppm(ts_arr, snd_arr)
+        keep = ts_arr >= a.warmup_s          # 시작 직후 몇 프레임은 한꺼번에 도착해 시계 차이가 인위적으로 커진다 → 드리프트 계산에서 제외
+        cam_ppm, pc_ppm = slope_ppm(ts_arr[keep], dev_arr[keep]), slope_ppm(ts_arr[keep], snd_arr[keep])
         t_axis = [round(t * 1000) for t in ts_arr]
         interval = np.diff(ts_arr) * 1000
         with open(d / "frames_axis.csv", "w", newline="") as fh:

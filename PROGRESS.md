@@ -134,3 +134,13 @@ CAN으로 받을 수 있는지 확인하고, 파라미터 50개 이상을 추출
 | 피드백 반영 | `EdgeMs=0` 제외, 첫 PERF 제외, 첫 2프레임 제외 간격, `fps_10s`, ID별 개수, 클래스 이름, `gap_before_s`·`t_start_wall_iso`, `definitions`. `meta.json` 을 UTF-8 로 통일(한글로 요약이 죽던 버그) |
 | 시험 | 가상 버스 다실행 분리·결번 검출, 실측 2건 재요약 (`results/can_canoe/20261006/logs/`) |
 | 미확인 | 6회·5분 실측, 실제 CANoe 가 만든 .asc, 로거의 `--raw on` 실카메라 경로, 실제 VN1630A 경로의 새 `meta.json` 항목 |
+
+## 2026-10-06 (추가 7) — CANoe 미사용 확정, 드리프트 워밍업 제외
+
+| 항목 | 내용 |
+|---|---|
+| 결정 | CANoe 는 쓰지 않는다 (사용자 확정). 수신·시간축 = `canoe_logger.py` (python-can, VN1630A 하드웨어 수신 시각). 문서에 명시 |
+| 합치기 | git 에서 Windows 로그 pull → `analyze.py` 로 r1 92/92, r2 93/93 합치기 성공. Windows 로거 `.asc` 를 python-can 이 정상 읽음 |
+| 발견 | 드리프트 667~677 ppm 은 시작 직후 3프레임 버스트(cam_minus_canoe 0→82 ms 후 평탄)로 생긴 인위적 값 |
+| 수정 | `analyze.py`(+`_no_comments`): 직선 맞춤에서 시작 후 `--warmup-s`(기본 3초) 제외 → r1 7.5 · r2 10.7 ppm. selftest 통과 |
+| 다음 | 사용자 지시: Raw 켬 60초 → 5분 이상 측정 (Windows 로거 먼저 켜고 READY 후 Ubuntu 실행) |
