@@ -54,6 +54,14 @@ YOLOv8n 예제(T7 외장하드 `camera_ai/*/yolov8n/`, 실카메라 검증 19 FP
 
 ## 3. 다음 할 일 (우선순위)
 
+**★★★ 2026-10-07 새 과제 (센서표 CAM01 전방 중앙 / CAM02 좌 전방) — 한 카메라 한 모델(차선+신호등 색+객체), 테스트는 전방 중앙만.**
+   - 목표(사용자): ≥5 fps, **칩 지연 ≤100 ms**, 인식률 **80%**(신호등 색·객체·차선). 객체 학습 클래스 = 사람·자동차 (+신호등 4색). **장애물은 학습하지 않고 깊이로 거리만 측정**(사용자 확정). **차선 지표 = 프레임 단위 검출 여부**(사용자 확정). 학습 PC: 성능 좋은 산업용 PC(사양 미확인, 무기한).
+   - 후보 5개(확정): A-YOLOM · YOLOPX · HybridNets · YOLOP · YOLOPv2. **분석·계획은 `can_canoe/model_candidates/README.md`, `TRAINING_PLAN_CAM01.md`** (구조 측정, 칩 변환 결과, 지연 추정, 학습 순서). 학습 PC 점검: `check_training_pc.py`.
+   - 핵심 결론: 512×288 에서 지연 목표 안에 들 것으로 추정되는 건 A-YOLOM(n) 뿐(깊이 끔 87 ms, 깊이 켬 116 ms 추정). 신호등은 입력 512×288 이상 필요(YOLO11s 재현율 512 0.91 / 416 0.83 / 320 0.62). YOLOPv2 는 학습 코드 없음.
+   - 평가 도구 `can_canoe/accuracy/` (신호등·객체·분할 + 칩에 사진 직접 입력 `chip_infer.py`), 칩 속도 `model_candidates/chip_bench.py`(둘 다 실카메라 미검증). `can_demo.py --mode debug|vehicle`.
+   - 자동 launch: `can_canoe/autolaunch/README.md` — DepthAI v3 는 RVC2 standalone 폐기, v2 플래시 방식만 가능, **CAN 은 변환 장치(UDP→CAN) 필요**. 실카메라 시험 대기.
+   - 이 맥에서 만든 YOLO11s 6 SHAVE NNArchive(`traffic_light-416x416-6shave.tar.xz`, git 제외)는 Ubuntu 로 옮기기 전(사용자가 USB 등으로 옮길 예정).
+
 **★★ 지금 바로 할 일 (2026-10-07): Raw 켬 측정 — `can_canoe/MEASURE.md` 를 순서대로 따라가면 된다.**
    - Raw 켬 = 카메라로 받을 수 있는 모든 데이터(깊이 포함, 교수님 정의). 코드·DBC·점검·정리 스크립트 준비 완료, 맥 selftest 통과. **실카메라 미검증.**
    - 순서: ① 양쪽 `git pull` ② 카메라 PC `python3 can_canoe/preflight.py --interface kvaser --channel 0 --nic enp6s0` ③ Windows `python canoe_logger.py --idle-exit 180` ④ **먼저 신호등 YOLO11s Raw 켬 60초** (`MODELS=traffic_light RAWS=on DURATION=60 INTERFACE=kvaser CHANNEL=0 NIC=enp6s0 ./run_matrix.sh`, `fps_avg`≈5·`dropped` 0 확인) ⑤ 본 측정 `./run_matrix.sh` (6회, Raw 끔 5분 결과가 있으면 `RAWS=on` 3회만도 가능, 같은 조건일 때) ⑥ `analyze.py` + `extra_messages.py` + `slide_perf_csv.py`.

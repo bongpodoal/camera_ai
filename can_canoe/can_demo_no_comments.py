@@ -56,7 +56,7 @@ class OakSource:
         a = self.args
         full = a.raw == "on"
         if a.model == "yolov6n":
-            if full:      # 공식 superblob 에서 SHAVE 수를 골라 쓰려고 아카이브로 받는다
+            if full:
                 desc = dai.NNModelDescription("yolov6-nano")
                 desc.platform = "RVC2"
                 return dai.NNArchive(dai.getModelFromZoo(desc))
@@ -72,6 +72,7 @@ class OakSource:
         model = self._model(dai)
         device = dai.Device(dai.DeviceInfo(a.ip))
         full = a.raw == "on"
+        debug = a.mode == "debug"
         with dai.Pipeline(device) as pipeline:
             if full:
                 camera = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
@@ -90,7 +91,7 @@ class OakSource:
                 network.input.setBlocking(False)
             except AttributeError:
                 print("경고: 이 노드에는 input 큐 설정이 없어 최신화 큐를 적용하지 못함")
-            print(f"설정: 카메라 {a.fps:g} fps 고정 · AI 입력 큐 크기 1 · 비차단(최신 프레임만) · 모델 {a.model} · raw {a.raw}"
+            print(f"설정: 모드 {a.mode} · 카메라 {a.fps:g} fps 고정 · AI 입력 큐 크기 1 · 비차단(최신 프레임만) · 모델 {a.model} · raw {a.raw}"
                   f"{' (깊이·텔레메트리·영상 모두 받음)' if full else ''}")
             edge_script = pipeline.create(dai.node.Script)
             edge_script.setScript(EDGE_SCRIPT)
@@ -116,7 +117,9 @@ class OakSource:
                 now_dai = dai.Clock.now()
                 total_ms = (now_dai - det.getTimestamp()).total_seconds() * 1000
                 post_ms, raw_bytes, frame, extra = 0.0, 0, None, {}
-                if frame_msg is not None:
+                if frame_msg is not None and not debug:
+                    raw_bytes = int(frame_msg.getData().nbytes)
+                elif frame_msg is not None:
                     t0 = time.perf_counter()
                     frame = frame_msg.getCvFrame()
                     raw_bytes = int(frame.nbytes)
@@ -131,11 +134,13 @@ class OakSource:
                     depth_msgs = depth_queue.tryGetAll()
                     depth_bytes = sum(int(m.getData().nbytes) for m in depth_msgs)
                     if self.session is None:
-                        self.session = oak_full.session_info(device, dai, network, a.model, frame.shape[1], frame.shape[0])
-                    extra = dict(meta=oak_full.frame_meta(frame_msg, det, now_dai, now_dai),
-                                 ext=[oak_full.det_ext(d) for d in det.detections],
-                                 tele=[oak_full.telemetry_row(x) for x in sys_queue.tryGetAll()],
-                                 depth_bytes=depth_bytes, depth_frame=depth_msgs[-1].getFrame() if depth_msgs else None)
+                        self.session = oak_full.session_info(device, dai, network, a.model, frame_msg.getWidth(), frame_msg.getHeight())
+                    extra = dict(
+                        meta=oak_full.frame_meta(frame_msg, det, now_dai, now_dai),
+                        ext=[oak_full.det_ext(d) for d in det.detections],
+                        tele=[oak_full.telemetry_row(x) for x in sys_queue.tryGetAll()],
+                        depth_bytes=depth_bytes,
+                        depth_frame=depth_msgs[-1].getFrame() if depth_msgs and debug else None)
                     raw_bytes += depth_bytes
                 for buf in edge_queue.tryGetAll():
                     self.edge_by_seq[buf.getSequenceNum()] = float(bytes(buf.getData()).decode())
@@ -174,7 +179,7 @@ class FakeSource:
                 extra = dict(meta=oak_full.fake_meta(seq), ext=[oak_full.fake_ext() for _ in dets], tele=tele,
                              depth_bytes=640 * 400 * 2, depth_frame=None)
             yield dict(seq=seq, dev_t=1000 + true_t * (1 + a.fake_ppm * 1e-6), t_pc=time.time(),
-                       total_ms=edge + 8, post_ms=2.0 if full else 0.0,
+                       total_ms=edge + 8, post_ms=2.0 if full and a.mode == "debug" else 0.0,
                        raw_bytes=(512 * 288 * 3 + 640 * 400 * 2) if full else 0, frame=None, dets=dets, **extra)
             time.sleep(max(0, t0 + seq / a.fps - time.monotonic()))
 
@@ -208,6 +213,8 @@ def main(argv=None):
     ap.add_argument("--edge-wait", type=float, default=0.0,
                     help="칩 지연값(EdgeMs)이 늦게 온 프레임을 최대 이 시간(초) 기다렸다 보낸다. 기본 0 = 기다리지 않음 (기다리면 그 프레임 송신이 약 20 ms 늦어 간격 지터가 생김, 안 기다리면 늦은 프레임의 EdgeMs 는 0 = 값 없음)")
     ap.add_argument("--nic", default="", help="OAK-D 가 꽂힌 이더넷 이름(예: enp5s0). 있으면 실제 수신 바이트를 잰다")
+    ap.add_argument("--mode", choices=("debug", "vehicle"), default="debug",
+                    help="debug: 박스 그린 이미지·깊이 PNG·검출 CSV 저장 (개발 확인용) / vehicle: 저장·그리기 없이 CAN 송신과 요약만 (실차용)")
     ap.add_argument("--save-every", type=float, default=1.0, help="--raw on 일 때 이미지 저장 간격(초)")
     ap.add_argument("--fake", action="store_true", help="카메라 없이 가짜 입력 (검증용)")
     ap.add_argument("--fake-ppm", type=float, default=0.0, help="--fake 일 때 카메라 시계를 이만큼(ppm) 빠르게")
@@ -215,7 +222,9 @@ def main(argv=None):
     a = ap.parse_args(argv)
 
     out = Path(a.out_dir).expanduser()
-    (out / "images").mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
+    if a.mode == "debug":
+        (out / "images").mkdir(exist_ok=True)
     kw = {} if a.interface == "virtual" else {"bitrate": a.bitrate}
     if a.fd and a.interface != "virtual":
         kw.update(fd=True, data_bitrate=a.data_bitrate)
@@ -296,8 +305,9 @@ def main(argv=None):
             for i, k in enumerate(order):
                 send(det_box(f["seq"], i, *f["dets"][k]))
             ext = f.get("ext") or [{}] * len(f["dets"])
-            for d, e in zip(f["dets"], ext):
-                det_rows.append([f["seq"], *d, *(e.get(k, "") for k in DET_EXT_COLS)])
+            if a.mode == "debug":
+                for d, e in zip(f["dets"], ext):
+                    det_rows.append([f["seq"], *d, *(e.get(k, "") for k in DET_EXT_COLS)])
             if a.raw == "on":
                 for m in oak_full.frame_messages(f["seq"], f["meta"], order, f["ext"]):
                     send(m)
@@ -341,10 +351,11 @@ def main(argv=None):
                         edge if edge is not None else "",
                         round(r["total_ms"] - edge, 2) if edge is not None else "",
                         round(r["post_ms"], 2), r["raw_bytes"], r.get("depth_bytes", 0), r["n_det"]])
-    with open(out / "detections.csv", "w", newline="") as fh:
-        w = csv.writer(fh)
-        w.writerow(["seq", "label", "confidence", "xmin", "ymin", "xmax", "ymax", *DET_EXT_COLS])
-        w.writerows(det_rows)
+    if a.mode == "debug":
+        with open(out / "detections.csv", "w", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(["seq", "label", "confidence", "xmin", "ymin", "xmax", "ymax", *DET_EXT_COLS])
+            w.writerows(det_rows)
 
     if tele_rows:
         with open(out / "telemetry.csv", "w", newline="") as fh:
@@ -356,7 +367,7 @@ def main(argv=None):
     edges = [source.edge_by_seq[r["seq"]] for r in rows if r["seq"] in source.edge_by_seq]
     pcs = [r["total_ms"] - source.edge_by_seq[r["seq"]] for r in rows if r["seq"] in source.edge_by_seq]
     eth = (nic1 - nic0) / dur if nic0 is not None and nic1 is not None else sum(r["raw_bytes"] for r in rows) / dur
-    summary = dict(model=a.model, raw=a.raw, camera_fps=a.fps, seconds=round(dur, 1), startup_s=startup_s, frames=len(rows),
+    summary = dict(model=a.model, raw=a.raw, mode=a.mode, camera_fps=a.fps, seconds=round(dur, 1), startup_s=startup_s, frames=len(rows),
                    dropped=dropped, fps_avg=round(len(rows) / dur, 2), edge_ms=med(edges), pc_ms=med(pcs),
                    post_ms=med([r["post_ms"] for r in rows]), eth_MBps=round(eth / 1e6, 3),
                    eth_source="nic" if nic0 is not None else "raw_frames_only",

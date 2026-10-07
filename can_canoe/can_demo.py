@@ -81,62 +81,83 @@ class OakSource:
             time.sleep(0.01)
 
     def _model(self, dai):
+        # 칩에 올릴 신경망 모델을 고른다 (config.json 은 이 모델 파일 안에 들어 있다)
         a = self.args
-        full = a.raw == "on"
+        full = a.raw == "on"                                    # Raw 켬이면 깊이가 SHAVE 를 써서 6 SHAVE 모델이 필요하다
         if a.model == "yolov6n":
-            if full:      # 공식 superblob 에서 SHAVE 수를 골라 쓰려고 아카이브로 받는다
+            if full:
+                # Raw 켬: 공식 superblob(SHAVE 1~16개용 패치가 한 파일에 들어 있음)을 아카이브로 받아 둔다. SHAVE 수는 아래에서 6 으로 고른다
                 desc = dai.NNModelDescription("yolov6-nano")
-                desc.platform = "RVC2"
+                desc.platform = "RVC2"                          # 이 카메라 칩(RVC2)용으로 받는다
                 return dai.NNArchive(dai.getModelFromZoo(desc))
+            # Raw 끔: 공식 예제는 이름만 주면 depthai 가 모델 저장소에서 받아 온다 (NNArchive = 모델 + config.json 묶음)
             return dai.NNModelDescription("yolov6-nano")
         if full and not a.archive and a.model in ARCHIVES_FULL:
+            # Raw 켬에서 쓸 6 SHAVE 로 다시 컴파일한 NNArchive (현재는 traffic_light_v8n 만 등록돼 있음)
             return dai.NNArchive(str(ROOT / ARCHIVES_FULL[a.model]))
+        # 나머지: 우리가 변환해 둔 NNArchive(.tar.xz) 파일을 직접 연다 (--archive 로 경로를 줄 수도 있음)
         return dai.NNArchive(a.archive or str(ROOT / ARCHIVES[a.model]))
 
     def frames(self, stop):
         import cv2
         import depthai as dai
         a = self.args
-        model = self._model(dai)
-        device = dai.Device(dai.DeviceInfo(a.ip))
-        full = a.raw == "on"
-        with dai.Pipeline(device) as pipeline:
+        model = self._model(dai)                        # 신경망 모델 (위 함수)
+        device = dai.Device(dai.DeviceInfo(a.ip))       # OAK-D 에 IP 로 직접 연결 (자동 탐색은 불안정해서 IP 를 쓴다)
+        full = a.raw == "on"                            # True = Raw 켬 = 카메라로 받을 수 있는 모든 데이터 / False = 검출 결과만
+        debug = a.mode == "debug"                       # 디버그: 영상 변환·박스 그리기·이미지 저장 / 실차(vehicle): 하지 않음
+        # ===== 1단계: 설계도(파이프라인) 만들기. 여기서 "칩이 무엇을 계산할지"가 정해진다. 아직 칩은 일하지 않는다 =====
+        with dai.Pipeline(device) as pipeline:          # 이 장치에서 돌 파이프라인(노드를 이어 붙인 설계도)
             if full:
-                # 모든 데이터: 스테레오 깊이 + 깊이 포함 검출망 (예제 07_host_output/edge_logger.py 와 같은 구성)
+                # --- Raw 켬: 스테레오 깊이 + 깊이 포함 검출망 (예제 07_host_output/edge_logger.py 와 같은 구성) ---
+                # 메인 컬러 카메라(CAM_A) 노드. 신경망에 넣을 영상을 만든다
                 camera = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
+                # 좌우 카메라 2개로 깊이 지도를 만드는 노드. 두 번째 인자 a.fps = 깊이도 카메라와 같은 5 fps 로 계산
                 depth = pipeline.create(dai.node.Depth).build(dai.node.Depth.Algorithm.AUTO, a.fps)
+                # 검출망 + "박스마다 깊이 지도에서 X/Y/Z 거리까지 계산"하는 노드 (일반 검출망 대신 이걸 쓴다 → 칩 부하가 늘어남)
                 network = pipeline.create(dai.node.SpatialDetectionNetwork).build(camera, depth, model, fps=a.fps)
                 if isinstance(model, dai.NNArchive) and model.getModelType() == dai.ModelType.SUPERBLOB:
+                    # 모델이 superblob(공식 yolov6n)이면 SHAVE 수를 6 으로 지정한다 (일반 blob 은 이미 6 SHAVE 로 컴파일돼 있어 지정 불가)
                     network.setNNArchive(model, FULL_SHAVES)
-                network.setDepthLowerThreshold(100)
-                network.setDepthUpperThreshold(20000)
+                network.setDepthLowerThreshold(100)      # 100 mm 보다 가까운 깊이값은 무효 (센서 최소 거리 근처의 잡음)
+                network.setDepthUpperThreshold(20000)    # 20 m 보다 먼 깊이값도 무효 (스테레오로는 믿기 어려운 거리)
+                # 깊이 계산에 쓴 분할(segmentation) 영상을 따로 내보내지 않는다 (우리는 검출 박스 기준 X/Y/Z 만 필요)
                 network.spatialLocationCalculator.initialConfig.setSegmentationPassthrough(False)
             else:
-                camera = pipeline.create(dai.node.Camera).build()
-                network = pipeline.create(dai.node.DetectionNetwork).build(camera, model, fps=a.fps)
+                # --- Raw 끔: 일반 검출망만. 깊이·칩 상태 계산은 아예 하지 않아 칩 부하가 가볍다 ---
+                camera = pipeline.create(dai.node.Camera).build()                                  # 기본 카메라 노드
+                network = pipeline.create(dai.node.DetectionNetwork).build(camera, model, fps=a.fps)  # 5 fps 로 검출만
             try:
-                network.input.setMaxSize(1)       # 최신화 큐: AI 가 바쁘면 옛 프레임을 버린다
-                network.input.setBlocking(False)
+                # 최신화 큐: 신경망 입력에 프레임을 1장만 담고(크기 1), 꽉 차도 기다리지 않고(비차단) 옛 프레임을 버린다
+                network.input.setMaxSize(1)       # 입력 큐 크기 1 (AI 가 바쁜 동안 쌓이는 줄을 없앤다 → 지연이 줄어든다)
+                network.input.setBlocking(False)  # 비차단 = 큐가 차면 새 프레임이 옛 프레임을 밀어낸다
             except AttributeError:
+                # 깊이 포함 노드에 이 설정이 없으면 건너뛴다 (그러면 지연이 늘 수 있으니 결과에 기록할 것)
                 print("경고: 이 노드에는 input 큐 설정이 없어 최신화 큐를 적용하지 못함")
-            print(f"설정: 카메라 {a.fps:g} fps 고정 · AI 입력 큐 크기 1 · 비차단(최신 프레임만) · 모델 {a.model} · raw {a.raw}"
-                  f"{' (깊이·텔레메트리·영상 모두 받음)' if full else ''}")
-            edge_script = pipeline.create(dai.node.Script)
-            edge_script.setScript(EDGE_SCRIPT)
-            network.out.link(edge_script.inputs["det"])
-            det_queue = network.out.createOutputQueue()
-            edge_queue = self.edge_queue = edge_script.outputs["edge"].createOutputQueue()
-            frame_queue = depth_queue = sys_queue = None
+            print(f"설정: 모드 {a.mode} · 카메라 {a.fps:g} fps 고정 · AI 입력 큐 크기 1 · 비차단(최신 프레임만) · 모델 {a.model} · raw {a.raw}"
+                  f"{' (깊이·텔레메트리·영상 모두 받음)' if full else ''}")      # 적용된 설정을 화면에 남긴다 (측정 기록용)
+            # --- 칩 안에서 "촬영 → 검출 결과가 나오기까지 지연"을 재는 작은 프로그램(Script 노드). 끔/켬 모두 넣는다 ---
+            edge_script = pipeline.create(dai.node.Script)         # 칩 안에서 파이썬 코드를 돌리는 노드
+            edge_script.setScript(EDGE_SCRIPT)                     # 위쪽 EDGE_SCRIPT 문자열이 칩 안에서 실행됨
+            network.out.link(edge_script.inputs["det"])            # 검출 결과를 이 노드의 입력("det")으로 연결
+            # ===== 2단계: 출력 큐 만들기. 큐를 만든 것만 PC 로 전송된다 =====
+            det_queue = network.out.createOutputQueue()            # 검출 결과 (클래스·신뢰도·박스, Raw 켬이면 X/Y/Z·ROI 포함)
+            edge_queue = self.edge_queue = edge_script.outputs["edge"].createOutputQueue()   # 칩 안 지연(ms)
+            frame_queue = depth_queue = sys_queue = None           # Raw 끔에서는 아래 세 큐를 만들지 않는다
             if full:
-                frame_queue = network.passthrough.createOutputQueue()
-                depth_queue = network.passthroughDepth.createOutputQueue(maxSize=2, blocking=False)
-                syslog = pipeline.create(dai.node.SystemLogger)
-                syslog.setRate(1.0)
-                sys_queue = syslog.out.createOutputQueue(maxSize=8, blocking=False)
+                # --- Raw 켬에서만 받는 것들 ---
+                frame_queue = network.passthrough.createOutputQueue()   # 신경망이 처리한 RGB 프레임 (+ 노출·ISO·시각 등 프레임 정보가 붙어 옴)
+                depth_queue = network.passthroughDepth.createOutputQueue(maxSize=2, blocking=False)   # 깊이 프레임 (큐 2개, 차면 옛 것 버림)
+                syslog = pipeline.create(dai.node.SystemLogger)         # 칩 온도·CPU·메모리를 재는 노드
+                syslog.setRate(1.0)                                     # 1초에 한 번 측정해서 보낸다
+                sys_queue = syslog.out.createOutputQueue(maxSize=8, blocking=False)   # 칩 상태 큐 (8개까지, 차면 옛 것 버림)
             else:
-                drop = pipeline.create(dai.node.Script)
-                drop.setScript(DROP_SCRIPT)
-                network.passthrough.link(drop.inputs["x"])
+                # Raw 끔: 처리된 RGB 프레임이 이더넷으로 나오지 않게 칩 안에서 버린다.
+                # (프레임 출력을 그냥 두면 장치가 연결을 끊는 경우가 있어서, 받아서 버리는 노드를 달아 둔다)
+                drop = pipeline.create(dai.node.Script)                 # 칩 안의 "받아서 버리는" 노드
+                drop.setScript(DROP_SCRIPT)                             # 입력을 읽고 아무것도 하지 않는 코드
+                network.passthrough.link(drop.inputs["x"])              # RGB 프레임 출력을 이 노드로 연결 (PC 로는 안 나감)
+            # ===== 3단계: 시작. 지금까지의 설계도와 신경망을 칩에 올려 실행한다. 이후에는 노드를 바꿀 수 없다 =====
             pipeline.start()
             while pipeline.isRunning() and not stop.is_set():
                 frame_msg = frame_queue.get() if frame_queue else None
@@ -145,27 +166,33 @@ class OakSource:
                 now_dai = dai.Clock.now()
                 total_ms = (now_dai - det.getTimestamp()).total_seconds() * 1000
                 post_ms, raw_bytes, frame, extra = 0.0, 0, None, {}
-                if frame_msg is not None:
+                if frame_msg is not None and not debug:
+                    raw_bytes = int(frame_msg.getData().nbytes)       # 실차 모드: 영상을 변환·그리기 없이 크기만 센다 (CPU·저장 절약)
+                elif frame_msg is not None:
                     t0 = time.perf_counter()
                     frame = frame_msg.getCvFrame()
                     raw_bytes = int(frame.nbytes)
                     h, w = frame.shape[:2]
-                    for d in det.detections:     # 후처리: 원본 위에 박스와 라벨을 그린다
+                    for d in det.detections:     # 후처리: 원본 위에 박스와 라벨을 그린다 (디버그 모드만)
                         p0, p1 = (int(d.xmin * w), int(d.ymin * h)), (int(d.xmax * w), int(d.ymax * h))
                         cv2.rectangle(frame, p0, p1, (255, 0, 0), 2)
                         cv2.putText(frame, f"{d.label} {d.confidence:.2f}", (p0[0], max(p0[1] - 4, 10)),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
                     post_ms = (time.perf_counter() - t0) * 1000
                 if full:
-                    depth_msgs = depth_queue.tryGetAll()
-                    depth_bytes = sum(int(m.getData().nbytes) for m in depth_msgs)
+                    # ===== 4단계: Raw 켬의 값 읽기. 데이터마다 꺼내는 곳이 다르다 =====
+                    depth_msgs = depth_queue.tryGetAll()                 # 깊이 큐에 쌓인 것을 기다리지 않고 전부 꺼냄
+                    depth_bytes = sum(int(m.getData().nbytes) for m in depth_msgs)   # 깊이 프레임 바이트 수 (이더넷 통신량 계산용)
                     if self.session is None:
-                        self.session = oak_full.session_info(device, dai, network, a.model, frame.shape[1], frame.shape[0])
-                    extra = dict(meta=oak_full.frame_meta(frame_msg, det, now_dai, now_dai),
-                                 ext=[oak_full.det_ext(d) for d in det.detections],
-                                 tele=[oak_full.telemetry_row(x) for x in sys_queue.tryGetAll()],
-                                 depth_bytes=depth_bytes, depth_frame=depth_msgs[-1].getFrame() if depth_msgs else None)
-                    raw_bytes += depth_bytes
+                        # 보정값(fx·fy·cx·cy·기선)·장치 ID·제품명 등은 스트림이 아니라 "한 번만 물어서" 읽는다 (첫 프레임 때)
+                        self.session = oak_full.session_info(device, dai, network, a.model, frame_msg.getWidth(), frame_msg.getHeight())
+                    extra = dict(
+                        meta=oak_full.frame_meta(frame_msg, det, now_dai, now_dai),       # 프레임 정보: 프레임 메시지에 붙어 온 노출·ISO·색온도·렌즈·크기·시각
+                        ext=[oak_full.det_ext(d) for d in det.detections],                 # 검출마다 X/Y/Z 거리와 깊이 ROI (검출 메시지 안에 들어 있음)
+                        tele=[oak_full.telemetry_row(x) for x in sys_queue.tryGetAll()],   # 칩 온도·CPU·메모리 (1초에 하나씩 쌓인 것)
+                        depth_bytes=depth_bytes,                                           # 깊이 프레임 바이트 수
+                        depth_frame=depth_msgs[-1].getFrame() if depth_msgs and debug else None)     # 가장 최근 깊이 프레임 (1초에 한 번 PNG 로 저장할 때 씀)
+                    raw_bytes += depth_bytes          # 이더넷으로 받은 양 = RGB 프레임 + 깊이 프레임
                 for buf in edge_queue.tryGetAll():
                     self.edge_by_seq[buf.getSequenceNum()] = float(bytes(buf.getData()).decode())
                 yield dict(seq=det.getSequenceNum(), dev_t=det.getTimestampDevice().total_seconds(),
@@ -205,7 +232,7 @@ class FakeSource:
                 extra = dict(meta=oak_full.fake_meta(seq), ext=[oak_full.fake_ext() for _ in dets], tele=tele,
                              depth_bytes=640 * 400 * 2, depth_frame=None)
             yield dict(seq=seq, dev_t=1000 + true_t * (1 + a.fake_ppm * 1e-6), t_pc=time.time(),
-                       total_ms=edge + 8, post_ms=2.0 if full else 0.0,
+                       total_ms=edge + 8, post_ms=2.0 if full and a.mode == "debug" else 0.0,
                        raw_bytes=(512 * 288 * 3 + 640 * 400 * 2) if full else 0, frame=None, dets=dets, **extra)
             time.sleep(max(0, t0 + seq / a.fps - time.monotonic()))
 
@@ -244,6 +271,8 @@ def main(argv=None):
     ap.add_argument("--edge-wait", type=float, default=0.0,
                     help="칩 지연값(EdgeMs)이 늦게 온 프레임을 최대 이 시간(초) 기다렸다 보낸다. 기본 0 = 기다리지 않음 (기다리면 그 프레임 송신이 약 20 ms 늦어 간격 지터가 생김, 안 기다리면 늦은 프레임의 EdgeMs 는 0 = 값 없음)")
     ap.add_argument("--nic", default="", help="OAK-D 가 꽂힌 이더넷 이름(예: enp5s0). 있으면 실제 수신 바이트를 잰다")
+    ap.add_argument("--mode", choices=("debug", "vehicle"), default="debug",
+                    help="debug: 박스 그린 이미지·깊이 PNG·검출 CSV 저장 (개발 확인용) / vehicle: 저장·그리기 없이 CAN 송신과 요약만 (실차용)")
     ap.add_argument("--save-every", type=float, default=1.0, help="--raw on 일 때 이미지 저장 간격(초)")
     ap.add_argument("--fake", action="store_true", help="카메라 없이 가짜 입력 (검증용)")
     ap.add_argument("--fake-ppm", type=float, default=0.0, help="--fake 일 때 카메라 시계를 이만큼(ppm) 빠르게")
@@ -251,7 +280,9 @@ def main(argv=None):
     a = ap.parse_args(argv)
 
     out = Path(a.out_dir).expanduser()
-    (out / "images").mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
+    if a.mode == "debug":
+        (out / "images").mkdir(exist_ok=True)
     kw = {} if a.interface == "virtual" else {"bitrate": a.bitrate}
     if a.fd and a.interface != "virtual":
         kw.update(fd=True, data_bitrate=a.data_bitrate)
@@ -335,8 +366,9 @@ def main(argv=None):
             for i, k in enumerate(order):
                 send(det_box(f["seq"], i, *f["dets"][k]))
             ext = f.get("ext") or [{}] * len(f["dets"])
-            for d, e in zip(f["dets"], ext):
-                det_rows.append([f["seq"], *d, *(e.get(k, "") for k in DET_EXT_COLS)])
+            if a.mode == "debug":                  # 검출 CSV 는 디버그 모드만 (실차 모드는 메모리·저장을 아낀다)
+                for d, e in zip(f["dets"], ext):
+                    det_rows.append([f["seq"], *d, *(e.get(k, "") for k in DET_EXT_COLS)])
             if a.raw == "on":                      # 카메라가 줄 수 있는 나머지 데이터 전부를 CAN 으로
                 for m in oak_full.frame_messages(f["seq"], f["meta"], order, f["ext"]):
                     send(m)
@@ -381,10 +413,11 @@ def main(argv=None):
                         edge if edge is not None else "",
                         round(r["total_ms"] - edge, 2) if edge is not None else "",
                         round(r["post_ms"], 2), r["raw_bytes"], r.get("depth_bytes", 0), r["n_det"]])
-    with open(out / "detections.csv", "w", newline="") as fh:
-        w = csv.writer(fh)
-        w.writerow(["seq", "label", "confidence", "xmin", "ymin", "xmax", "ymax", *DET_EXT_COLS])
-        w.writerows(det_rows)
+    if a.mode == "debug":
+        with open(out / "detections.csv", "w", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(["seq", "label", "confidence", "xmin", "ymin", "xmax", "ymax", *DET_EXT_COLS])
+            w.writerows(det_rows)
 
     if tele_rows:
         with open(out / "telemetry.csv", "w", newline="") as fh:
@@ -396,7 +429,7 @@ def main(argv=None):
     edges = [source.edge_by_seq[r["seq"]] for r in rows if r["seq"] in source.edge_by_seq]
     pcs = [r["total_ms"] - source.edge_by_seq[r["seq"]] for r in rows if r["seq"] in source.edge_by_seq]
     eth = (nic1 - nic0) / dur if nic0 is not None and nic1 is not None else sum(r["raw_bytes"] for r in rows) / dur
-    summary = dict(model=a.model, raw=a.raw, camera_fps=a.fps, seconds=round(dur, 1), startup_s=startup_s, frames=len(rows),
+    summary = dict(model=a.model, raw=a.raw, mode=a.mode, camera_fps=a.fps, seconds=round(dur, 1), startup_s=startup_s, frames=len(rows),
                    dropped=dropped, fps_avg=round(len(rows) / dur, 2), edge_ms=med(edges), pc_ms=med(pcs),
                    post_ms=med([r["post_ms"] for r in rows]), eth_MBps=round(eth / 1e6, 3),
                    eth_source="nic" if nic0 is not None else "raw_frames_only",

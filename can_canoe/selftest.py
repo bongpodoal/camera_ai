@@ -62,6 +62,14 @@ check("추가 메시지: 보정·장치 정보 도착", ex_counts.get("CALIB_A",
 check(f"장치 ID 문자열 복원 ({ex_texts.get('device_id')})", ex_texts.get("device_id") == "19443010C19B387E00" and ex_texts.get("product_name") == "OAK-D-PRO-POE-FF")
 off_rows = [r for r in cmp_rows if r["raw"] == "off"]
 check("Raw 끔 실행에는 추가 메시지 없음 (CAN 부하가 Raw 켬보다 작음)", all(float(o["can_load_pct"]) < float(c["can_load_pct"]) for o, c in zip(cmp_rows[0::2], cmp_rows[1::2])))
+vdir = root / "vehicle_run"
+vrc = can_demo.main(["--fake", "--raw", "on", "--mode", "vehicle", "--fps", "10", "--duration", "6", "--interface", "virtual",
+                     "--channel", "selftest_vehicle", "--out-dir", str(vdir)])
+vrows = list(csv.DictReader(open(vdir / "frames.csv")))
+check("실차 모드: 종료 코드 0, frames.csv·summary.csv 있음", vrc == 0 and (vdir / "summary.csv").exists() and len(vrows) >= 40)
+check("실차 모드: 이미지 폴더·detections.csv 를 만들지 않음", not (vdir / "images").exists() and not (vdir / "detections.csv").exists())
+check("실차 모드: 박스 그리기 시간 0", all(float(r["post_ms"]) == 0.0 for r in vrows))
+check("디버그 모드(기본): 이미지 폴더·detections.csv 있음", (root / "1_yolov6n_off" / "images").exists() and (root / "1_yolov6n_off" / "detections.csv").exists())
 check("compare.md 생성", (root / "compare.md").exists())
 print("결과:", "통과" if not fails else f"실패 {fails}")
 print((root / "compare.md").read_text())

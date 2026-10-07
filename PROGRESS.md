@@ -241,3 +241,28 @@ CAN으로 받을 수 있는지 확인하고, 파라미터 50개 이상을 추출
 | 미해결 | **YOLO11s(traffic_light)**: 이 PC 에 `.pt`·ONNX·IR `.bin` 없음(`.xml` 만) → 6 SHAVE 변환본 없음. 원본은 비공개라 사용자 승인 없이 옮기지 않음 |
 | 링크 문제 | `can_demo --raw on` 이 7프레임 뒤 멈춤. 이더넷이 **10 Mbps**(정상 100) 로만 붙고 NO-CARRIER 반복, 이후 카메라가 부트로더 상태로 남아 `Couldn't write data to stream: '__bootloader'` 로 부팅 불가. Raw 켬은 RGB+깊이 프레임 약 4 MB/s(약 38 Mbps)라 10 Mbps 로는 불가능. 케이블·PoE 전원 의심, 소프트웨어(nmcli 재연결)로는 복구 안 됨 |
 | 상태 | **Raw 켬 측정 데이터 없음.** 사용자가 카메라 PoE 케이블·전원을 다시 연결해 `/sys/class/net/enp6s0/speed` 가 100 이상이 된 뒤 yolov6n 60초 확인부터 재개 |
+
+## 2026-10-07 (추가 16) — 새 과제(전방 중앙/좌 전방 한 모델) 맥 준비 작업
+
+| 항목 | 내용 |
+|---|---|
+| 새 과제 | 센서표(CAM01 전방 중앙, CAM02 좌 전방): 토출 값 분석·모델 정하기 / 디버그·실차 모드 / 몇 fps 까지 안정적인가 / **테스트는 전방 중앙만** / Raw On·Off 비교 / 자동 launch 분석. 방향: **카메라당 모델 하나가 차선+신호등(색)+객체**. 목표 ≥5 fps, 칩 지연 ≤100 ms, 인식률 **80%** |
+| 후보(확정) | ① A-YOLOM ② YOLOPX ③ HybridNets ④ YOLOP ⑤ YOLOPv2. 학습 코드 없음: YOLOPv2 |
+| 구조 측정 | `can_canoe/model_candidates/measure_arch.py`: 파라미터·GMACs(512×288): A-YOLOM(n) 3.64M·3.35 / (s) 13.61M·10.52 / HybridNets d3 13.44M·4.57(512×256) / YOLOP 7.94M·5.55 / YOLOPX 32.98M·26.66 / YOLOPv2 38.95M·21.71 |
+| 칩 변환 | A-YOLOM(n) 성공(7.4MB, 6 SHAVE). HybridNets 는 ONNX `Pad` 빈 입력 31개 제거 후 성공(51MB). YOLOP 는 Luxonis 변환본 있음(15.61 inf/s @320). YOLOPX·YOLOPv2 는 무거워 시도 안 함 |
+| 칩 지연 추정 | `estimate_latency.py`(58 GMACs/s 보정, 지연=추론×1.5): A-YOLOM(n) 512×288 만 100 ms 안(87 ms, 깊이 켬 116 ms). **추정** |
+| 신호등 해상도 | YOLO11s PyTorch 재현율: 320 0.62 / 416 0.83 / **512 0.91** / 640 0.95 / 960 0.97 → 입력 512×288 이상 권장 |
+| 평가 도구 | `accuracy/`: 신호등(`eval_core`), 객체 클래스별(`eval_det`), 분할(`eval_seg`) + 검증 테스트 통과, `chip_infer.py`(칩에 사진 직접 입력, 실카메라 미검증) |
+| 디버그/실차 | `can_demo.py --mode debug|vehicle` (실차: 박스 그리기·이미지·깊이 PNG·검출 CSV 없음). 맥 selftest 통과 |
+| 자동 launch | `can_canoe/autolaunch/`: v3 는 RVC2 standalone 폐기, v2 플래시 방식만 가능(폐기 기능), CAN 은 변환 장치 필요. 시험 스크립트 준비, 변환 장치(UDP→CAN) 맥 시험 통과 |
+| 학습 준비 | `model_candidates/TRAINING_PLAN_CAM01.md`, `check_training_pc.py`. YOLO11s 6 SHAVE NNArchive 는 맥에서 완성(git 제외) |
+| 미검증 | 실카메라(칩 속도 실측, v2 standalone, chip_infer), 학습, 장애물 정의·데이터 |
+
+## 2026-10-07 (추가 17) — 사용자 결정 반영 (장애물·차선 지표)
+
+| 항목 | 결정 | 반영 |
+|---|---|---|
+| 장애물 | **물체 종류는 중요하지 않고 거리만 측정 가능하면 됨** → 학습 클래스에서 제외 (학습 클래스: 신호등 4색 + 사람 + 자동차) | 깊이로 거리 측정(주행 경로 영역의 최근접 거리, `SpatialLocationCalculator` 후보). 구현·실측 전, `TRAINING_PLAN_CAM01.md` |
+| 차선 지표 | **프레임 단위 검출 여부** (검출률 ≥ 80%, 오경보율 같이) | `accuracy/eval_seg.py` 의 `presence_stats` + 시험 통과 |
+| 학습 PC 사양 | 학습 PC 에서 직접 알려 주기로 함 | `check_training_pc.py` 실행 결과 대기 |
+| 커밋·푸시 | 사용자가 지시 | 이 기록과 함께 푸시 |
