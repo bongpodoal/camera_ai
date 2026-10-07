@@ -41,6 +41,12 @@ ARCHIVES = {      # latency_latest.py 와 같은 모델 (yolov6n 은 공식 예�
     "traffic_light_11n": "traffic_light/05_nnarchive/traffic_light_11n-416x416.tar.xz",
     "traffic_light_v8n": "traffic_light/05_nnarchive/traffic_light_v8n-416x416.tar.xz",
 }
+# 깊이(스테레오)가 칩 SHAVE 를 써서 신경망에는 7개만 남는다 → Raw 켬은 6 SHAVE 로 컴파일한 모델을 쓴다.
+# (8 SHAVE 로 굳은 blob 은 "Blob compiled for 8 shaves, but only 7 are available" 로 시작하지 못함)
+FULL_SHAVES = 6
+ARCHIVES_FULL = {
+    "traffic_light_v8n": "traffic_light/05_nnarchive/traffic_light_v8n-416x416-6shave.tar.xz",
+}
 # 칩 위 코드 ① 엣지 지연 재기 (칩 시계끼리 뺀다. getTimestamp() 는 펌웨어 크래시라 쓰지 않는다)
 EDGE_SCRIPT = """
 while True:
@@ -76,8 +82,15 @@ class OakSource:
 
     def _model(self, dai):
         a = self.args
+        full = a.raw == "on"
         if a.model == "yolov6n":
+            if full:      # 공식 superblob 에서 SHAVE 수를 골라 쓰려고 아카이브로 받는다
+                desc = dai.NNModelDescription("yolov6-nano")
+                desc.platform = "RVC2"
+                return dai.NNArchive(dai.getModelFromZoo(desc))
             return dai.NNModelDescription("yolov6-nano")
+        if full and not a.archive and a.model in ARCHIVES_FULL:
+            return dai.NNArchive(str(ROOT / ARCHIVES_FULL[a.model]))
         return dai.NNArchive(a.archive or str(ROOT / ARCHIVES[a.model]))
 
     def frames(self, stop):
@@ -93,6 +106,8 @@ class OakSource:
                 camera = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
                 depth = pipeline.create(dai.node.Depth).build(dai.node.Depth.Algorithm.AUTO, a.fps)
                 network = pipeline.create(dai.node.SpatialDetectionNetwork).build(camera, depth, model, fps=a.fps)
+                if isinstance(model, dai.NNArchive) and model.getModelType() == dai.ModelType.SUPERBLOB:
+                    network.setNNArchive(model, FULL_SHAVES)
                 network.setDepthLowerThreshold(100)
                 network.setDepthUpperThreshold(20000)
                 network.spatialLocationCalculator.initialConfig.setSegmentationPassthrough(False)

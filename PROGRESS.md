@@ -230,3 +230,14 @@ CAN으로 받을 수 있는지 확인하고, 파라미터 50개 이상을 추출
 | 도구 | `preflight.py`(패키지·DBC·ping·모델 파일·CAN·NIC 점검), `run_matrix.sh` 에 `MODELS`·`RAWS` 선택·완료 안내 추가 |
 | 5 fps 전망 | yolov6n·v8n 여유 큼(과거: 깊이 켬 20 fps 정상), YOLO11s 는 추정 한계 5.7~8.2 fps (모델 한계 9.75 fps + 깊이 오버헤드 추정) → 첫 60초 확인 필수 |
 | 상태 | 맥 selftest 통과. 실카메라·실로거 미검증. 장비 세팅 후 사용자 지시로 측정 |
+
+## 2026-10-07 (추가 16) — Raw 켬 첫 시도: SHAVE 8 vs 7 원인·해결, 링크 문제로 측정 미완
+
+| 항목 | 내용 |
+|---|---|
+| 시도 | 3모델 Raw 켬 60초 (`run_matrix.sh`, Windows 로거 READY 후). **3회 모두 카메라 시작 실패, CAN 프레임 0개** |
+| 원인 | depthai 3.10: 깊이(스테레오)가 칩 SHAVE 를 써서 신경망에 7개만 남음. 8 SHAVE 로 굳은 blob 은 `Blob compiled for 8 shaves, but only 7 are available` 로 시작 못 함. 기존 `example/07_host_output/edge_logger.py` 로도 재현 → 코드 문제 아님 |
+| 해결 (깊이 단독 12초 59프레임으로 확인) | **Raw 켬은 6 SHAVE 블롭, Raw 끔은 기존 8 SHAVE 블롭** (둘의 차이를 결과에 명시). yolov6n: 공식 superblob 을 `NNArchive` 로 받아 `setNNArchive(archive, 6)`. traffic_light_v8n: IR 을 `blobconverter.from_openvino(shaves=6)` 로 재컴파일 → `traffic_light_v8n-416x416-6shave.tar.xz` (git 에 올리지 않음). 코드: `can_demo.py`·`can_demo_no_comments.py` 의 `FULL_SHAVES=6`·`ARCHIVES_FULL` |
+| 미해결 | **YOLO11s(traffic_light)**: 이 PC 에 `.pt`·ONNX·IR `.bin` 없음(`.xml` 만) → 6 SHAVE 변환본 없음. 원본은 비공개라 사용자 승인 없이 옮기지 않음 |
+| 링크 문제 | `can_demo --raw on` 이 7프레임 뒤 멈춤. 이더넷이 **10 Mbps**(정상 100) 로만 붙고 NO-CARRIER 반복, 이후 카메라가 부트로더 상태로 남아 `Couldn't write data to stream: '__bootloader'` 로 부팅 불가. Raw 켬은 RGB+깊이 프레임 약 4 MB/s(약 38 Mbps)라 10 Mbps 로는 불가능. 케이블·PoE 전원 의심, 소프트웨어(nmcli 재연결)로는 복구 안 됨 |
+| 상태 | **Raw 켬 측정 데이터 없음.** 사용자가 카메라 PoE 케이블·전원을 다시 연결해 `/sys/class/net/enp6s0/speed` 가 100 이상이 된 뒤 yolov6n 60초 확인부터 재개 |

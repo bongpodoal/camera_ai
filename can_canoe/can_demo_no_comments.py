@@ -21,6 +21,10 @@ ARCHIVES = {
     "traffic_light_11n": "traffic_light/05_nnarchive/traffic_light_11n-416x416.tar.xz",
     "traffic_light_v8n": "traffic_light/05_nnarchive/traffic_light_v8n-416x416.tar.xz",
 }
+FULL_SHAVES = 6
+ARCHIVES_FULL = {
+    "traffic_light_v8n": "traffic_light/05_nnarchive/traffic_light_v8n-416x416-6shave.tar.xz",
+}
 EDGE_SCRIPT = """
 while True:
     det = node.inputs['det'].get()
@@ -50,8 +54,15 @@ class OakSource:
 
     def _model(self, dai):
         a = self.args
+        full = a.raw == "on"
         if a.model == "yolov6n":
+            if full:      # 공식 superblob 에서 SHAVE 수를 골라 쓰려고 아카이브로 받는다
+                desc = dai.NNModelDescription("yolov6-nano")
+                desc.platform = "RVC2"
+                return dai.NNArchive(dai.getModelFromZoo(desc))
             return dai.NNModelDescription("yolov6-nano")
+        if full and not a.archive and a.model in ARCHIVES_FULL:
+            return dai.NNArchive(str(ROOT / ARCHIVES_FULL[a.model]))
         return dai.NNArchive(a.archive or str(ROOT / ARCHIVES[a.model]))
 
     def frames(self, stop):
@@ -66,6 +77,8 @@ class OakSource:
                 camera = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
                 depth = pipeline.create(dai.node.Depth).build(dai.node.Depth.Algorithm.AUTO, a.fps)
                 network = pipeline.create(dai.node.SpatialDetectionNetwork).build(camera, depth, model, fps=a.fps)
+                if isinstance(model, dai.NNArchive) and model.getModelType() == dai.ModelType.SUPERBLOB:
+                    network.setNNArchive(model, FULL_SHAVES)
                 network.setDepthLowerThreshold(100)
                 network.setDepthUpperThreshold(20000)
                 network.spatialLocationCalculator.initialConfig.setSegmentationPassthrough(False)

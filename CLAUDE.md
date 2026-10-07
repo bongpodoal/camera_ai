@@ -59,6 +59,7 @@ YOLOv8n 예제(T7 외장하드 `camera_ai/*/yolov8n/`, 실카메라 검증 19 FP
    - 순서: ① 양쪽 `git pull` ② 카메라 PC `python3 can_canoe/preflight.py --interface kvaser --channel 0 --nic enp6s0` ③ Windows `python canoe_logger.py --idle-exit 180` ④ **먼저 신호등 YOLO11s Raw 켬 60초** (`MODELS=traffic_light RAWS=on DURATION=60 INTERFACE=kvaser CHANNEL=0 NIC=enp6s0 ./run_matrix.sh`, `fps_avg`≈5·`dropped` 0 확인) ⑤ 본 측정 `./run_matrix.sh` (6회, Raw 끔 5분 결과가 있으면 `RAWS=on` 3회만도 가능, 같은 조건일 때) ⑥ `analyze.py` + `extra_messages.py` + `slide_perf_csv.py`.
    - 5 fps 유지 전망(추정): yolov6n·v8n 여유 큼, YOLO11s 는 한계 5.7~8.2 fps 로 추정돼 아슬아슬. 못 따라가면 `FPS=4`(끔도 다시 잼) 또는 11n 교체.
    - 사용자는 장비 세팅 후 직접 측정 시작·지시. 커밋·푸시는 지시할 때만.
+   - **2026-10-07 결과 (과제 종료, Raw 켬 측정은 미완):** 깊이가 칩 SHAVE 를 써서 신경망에 7개만 남아 8 SHAVE 블롭은 시작 불가 → **Raw 켬은 6 SHAVE 블롭, Raw 끔은 8 SHAVE 블롭**(결과에 명시). yolov6n 은 `setNNArchive(archive, 6)`, 신호등 모델은 `blobconverter shaves=6` 재컴파일(`ARCHIVES_FULL`, 코드 반영). 이후 카메라 이더넷이 10 Mbps 로 떨어져(케이블·PoE 의심) 측정 못 함. 모델 6 SHAVE 아카이브(.tar.xz)는 git 제외. 상세는 `PROGRESS.md` 추가 16.
 
 **★ 2026-10-06 새 과제 — `can_canoe/` (README 먼저 읽을 것).** 카메라 출력을 CAN 으로 CANoe 에 보내 받고, Raw 수신 여부(끔/켬)별 연산·통신 속도를 3모델로 비교.
    - **2026-10-06 최종 결정: CANoe 는 쓰지 않는다 (사용자 확정).** 수신·시간축은 Windows 노트북의 `can_canoe/canoe_logger.py`(python-can, VN1630A) 가 맡고, 시각 = **VN1630A 하드웨어 수신 시각**(meta.json `timestamp_source`). 문서·결과에 "CANoe 대신 python-can 기반 로거 사용" 명시. 아래 CANoe 설정 안내는 폐기(참고용). 실제 CANoe `.asc` 읽기 확인은 해당 없음.
