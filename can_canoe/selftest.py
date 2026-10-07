@@ -13,6 +13,7 @@ import can
 
 import analyze
 import can_demo
+import extra_messages
 from canoe_sim import CanoeSim
 
 root = Path(tempfile.mkdtemp())
@@ -51,6 +52,16 @@ perf_n = sum(1 for m in can.LogReader(str(log)) if m.arbitration_id == 0x320)
 check(f"PERF 메시지가 로그에 있음 ({perf_n}개)", perf_n >= 8)
 fd_n = sum(1 for m in can.LogReader(str(log)) if getattr(m, "is_fd", False))
 check(f"FD 프레임이 로그에 있음 ({fd_n}개, 마지막 실행)", fd_n >= 100)
+ex_counts, ex_texts = extra_messages.extract(log, root / "extra")
+n_on = sum(int(c["frames_rx"]) for c in cmp_rows if c["raw"] == "on")
+n_box = sum(1 for m in can.LogReader(str(log)) if m.arbitration_id == 0x310)
+check(f"추가 메시지: FRAME_META_A = Raw 켬 프레임 수 ({ex_counts.get('FRAME_META_A')}/{n_on})", ex_counts.get("FRAME_META_A") == n_on)
+check(f"추가 메시지: DET_POS = DET_ROI = Raw 켬 검출 수 ({ex_counts.get('DET_POS')})", ex_counts.get("DET_POS") == ex_counts.get("DET_ROI") and ex_counts.get("DET_POS", 0) > 0)
+check(f"추가 메시지: 칩 상태 4종 1 Hz ({ex_counts.get('DEV_TEMP')}개)", ex_counts.get("DEV_TEMP", 0) >= 15 and ex_counts.get("DEV_TEMP") == ex_counts.get("DEV_MEM_C"))
+check("추가 메시지: 보정·장치 정보 도착", ex_counts.get("CALIB_A", 0) >= 2 and ex_counts.get("CALIB_B", 0) >= 2 and ex_counts.get("CALIB_C", 0) >= 2)
+check(f"장치 ID 문자열 복원 ({ex_texts.get('device_id')})", ex_texts.get("device_id") == "19443010C19B387E00" and ex_texts.get("product_name") == "OAK-D-PRO-POE-FF")
+off_rows = [r for r in cmp_rows if r["raw"] == "off"]
+check("Raw 끔 실행에는 추가 메시지 없음 (CAN 부하가 Raw 켬보다 작음)", all(float(o["can_load_pct"]) < float(c["can_load_pct"]) for o, c in zip(cmp_rows[0::2], cmp_rows[1::2])))
 check("compare.md 생성", (root / "compare.md").exists())
 print("결과:", "통과" if not fails else f"실패 {fails}")
 print((root / "compare.md").read_text())

@@ -42,6 +42,103 @@ BO_ 800 PERF: 8 CAM_PC
  SG_ CanLoadPct : 40|8@1+ (0.5,0) [0|127.5] "%" CANOE
  SG_ DroppedTotal : 48|16@1+ (1,0) [0|65535] "" CANOE
 
+BO_ 816 DET_POS: 8 CAM_PC
+ SG_ SeqLo : 0|4@1+ (1,0) [0|15] "" CANOE
+ SG_ Index : 4|4@1+ (1,0) [0|15] "" CANOE
+ SG_ X : 8|16@1- (1,0) [-32768|32767] "mm" CANOE
+ SG_ Y : 24|16@1- (1,0) [-32768|32767] "mm" CANOE
+ SG_ Z : 40|16@1+ (1,0) [0|65535] "mm" CANOE
+
+BO_ 817 DET_ROI: 8 CAM_PC
+ SG_ SeqLo : 0|4@1+ (1,0) [0|15] "" CANOE
+ SG_ Index : 4|4@1+ (1,0) [0|15] "" CANOE
+ SG_ RoiX : 8|12@1+ (1,0) [0|4095] "px" CANOE
+ SG_ RoiY : 20|12@1+ (1,0) [0|4095] "px" CANOE
+ SG_ RoiW : 32|12@1+ (1,0) [0|4095] "px" CANOE
+ SG_ RoiH : 44|12@1+ (1,0) [0|4095] "px" CANOE
+
+BO_ 832 FRAME_META_A: 8 CAM_PC
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" CANOE
+ SG_ ExposureUs : 16|20@1+ (1,0) [0|1048575] "us" CANOE
+ SG_ Iso : 36|12@1+ (1,0) [0|4095] "" CANOE
+ SG_ ColorTempK : 48|14@1+ (1,0) [0|16383] "K" CANOE
+
+BO_ 833 FRAME_META_B: 8 CAM_PC
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" CANOE
+ SG_ LensPos : 16|10@1- (1,0) [-512|511] "" CANOE
+ SG_ SourceW : 26|13@1+ (1,0) [0|8191] "px" CANOE
+ SG_ SourceH : 39|13@1+ (1,0) [0|8191] "px" CANOE
+ SG_ CamInstance : 52|4@1+ (1,0) [0|15] "" CANOE
+ SG_ FrameType : 56|8@1+ (1,0) [0|255] "" CANOE
+
+BO_ 834 FRAME_META_C: 8 CAM_PC
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" CANOE
+ SG_ FrameW : 16|13@1+ (1,0) [0|8191] "px" CANOE
+ SG_ FrameH : 29|13@1+ (1,0) [0|8191] "px" CANOE
+ SG_ HfovDeg : 42|11@1+ (0.1,0) [0|204.7] "deg" CANOE
+ SG_ VfovDeg : 53|11@1+ (0.1,0) [0|204.7] "deg" CANOE
+
+BO_ 835 FRAME_TIME_DEV: 8 CAM_PC
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" CANOE
+ SG_ TsDeviceUs : 16|32@1+ (1,0) [0|4294967295] "us" CANOE
+ SG_ DetLatencyMs : 48|16@1+ (0.1,0) [0|6553.5] "ms" CANOE
+
+BO_ 836 FRAME_TIME_HOST: 8 CAM_PC
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" CANOE
+ SG_ TsHostUs : 16|32@1+ (1,0) [0|4294967295] "us" CANOE
+ SG_ FrameLatencyMs : 48|16@1+ (0.1,0) [0|6553.5] "ms" CANOE
+
+BO_ 848 DEV_TEMP: 8 CAM_PC
+ SG_ TempCss : 0|8@1+ (0.5,-40) [-40|87.5] "degC" CANOE
+ SG_ TempMss : 8|8@1+ (0.5,-40) [-40|87.5] "degC" CANOE
+ SG_ TempUpa : 16|8@1+ (0.5,-40) [-40|87.5] "degC" CANOE
+ SG_ TempDss : 24|8@1+ (0.5,-40) [-40|87.5] "degC" CANOE
+ SG_ TempAvg : 32|8@1+ (0.5,-40) [-40|87.5] "degC" CANOE
+ SG_ CpuCssPct : 40|8@1+ (0.5,0) [0|127.5] "%" CANOE
+ SG_ CpuMssPct : 48|8@1+ (0.5,0) [0|127.5] "%" CANOE
+
+BO_ 849 DEV_MEM_A: 8 CAM_PC
+ SG_ DdrUsedMB : 0|16@1+ (0.1,0) [0|6553.5] "MB" CANOE
+ SG_ DdrTotalMB : 16|16@1+ (0.1,0) [0|6553.5] "MB" CANOE
+ SG_ CmxUsedKB : 32|16@1+ (0.1,0) [0|6553.5] "KB" CANOE
+ SG_ CmxTotalKB : 48|16@1+ (0.1,0) [0|6553.5] "KB" CANOE
+
+BO_ 850 DEV_MEM_B: 8 CAM_PC
+ SG_ CssHeapUsedKB : 0|32@1+ (1,0) [0|4294967295] "KB" CANOE
+ SG_ CssHeapTotalKB : 32|32@1+ (1,0) [0|4294967295] "KB" CANOE
+
+BO_ 851 DEV_MEM_C: 8 CAM_PC
+ SG_ MssHeapUsedKB : 0|32@1+ (1,0) [0|4294967295] "KB" CANOE
+ SG_ MssHeapTotalKB : 32|32@1+ (1,0) [0|4294967295] "KB" CANOE
+
+BO_ 864 CALIB_A: 8 CAM_PC
+ SG_ Fx : 0|16@1+ (0.1,0) [0|6553.5] "px" CANOE
+ SG_ Fy : 16|16@1+ (0.1,0) [0|6553.5] "px" CANOE
+ SG_ Cx : 32|16@1+ (0.1,0) [0|6553.5] "px" CANOE
+ SG_ Cy : 48|16@1+ (0.1,0) [0|6553.5] "px" CANOE
+
+BO_ 865 CALIB_B: 8 CAM_PC
+ SG_ BaselineCm : 0|16@1+ (0.01,0) [0|655.35] "cm" CANOE
+ SG_ DepthLoMm : 16|16@1+ (1,0) [0|65535] "mm" CANOE
+ SG_ DepthHiMm : 32|16@1+ (1,0) [0|65535] "mm" CANOE
+ SG_ NClasses : 48|8@1+ (1,0) [0|255] "" CANOE
+ SG_ ConfThresholdPct : 56|8@1+ (1,0) [0|255] "%" CANOE
+
+BO_ 866 CALIB_C: 8 CAM_PC
+ SG_ NnInputW : 0|16@1+ (1,0) [0|65535] "px" CANOE
+ SG_ NnInputH : 16|16@1+ (1,0) [0|65535] "px" CANOE
+ SG_ SpatialOn : 32|1@1+ (1,0) [0|1] "" CANOE
+ SG_ CameraMask : 33|8@1+ (1,0) [0|255] "" CANOE
+
+BO_ 880 DEV_INFO: 8 CAM_PC
+ SG_ StrId : 0|4@1+ (1,0) [0|15] "" CANOE
+ SG_ Chunk : 4|4@1+ (1,0) [0|15] "" CANOE
+ SG_ TotalLen : 8|8@1+ (1,0) [0|255] "" CANOE
+ SG_ C0 : 16|8@1+ (1,0) [0|255] "" CANOE
+ SG_ C1 : 24|8@1+ (1,0) [0|255] "" CANOE
+ SG_ C2 : 32|8@1+ (1,0) [0|255] "" CANOE
+ SG_ C3 : 40|8@1+ (1,0) [0|255] "" CANOE
+ SG_ C4 : 48|8@1+ (1,0) [0|255] "" CANOE
 
 
 CM_ BU_ CAM_PC "PC that reads the OAK-D over Ethernet and sends the results on CAN.";
@@ -63,6 +160,22 @@ CM_ SG_ 800 PostMs "Time to draw boxes on the raw image. 0 when RawOn=0.";
 CM_ SG_ 800 EthKBps "Bytes received from the camera over Ethernet per second, in KB.";
 CM_ SG_ 800 CanLoadPct "Estimated CAN bus load, worst case bit stuffing.";
 CM_ SG_ 800 DroppedTotal "Total frames dropped by the camera input queue since start.";
+CM_ BO_ 816 "Raw mode. Per detection: position from the stereo depth map, camera frame +X right +Y down +Z forward. Same SeqLo/Index as DET_BOX.";
+CM_ BO_ 817 "Raw mode. Per detection: depth ROI in depth-frame pixels.";
+CM_ BO_ 832 "Raw mode. Per frame: exposure, ISO, color temperature.";
+CM_ BO_ 833 "Raw mode. Per frame: lens position (-1 = fixed focus), sensor size, camera socket, pixel format code.";
+CM_ BO_ 834 "Raw mode. Per frame: size of the image the network processed, field of view.";
+CM_ BO_ 835 "Raw mode. Per frame: capture time on the camera clock (microseconds, wraps at 71.6 min) and capture-to-detection latency.";
+CM_ BO_ 836 "Raw mode. Per frame: capture time synced to the host clock (microseconds, wraps) and capture-to-frame latency.";
+CM_ BO_ 848 "Raw mode. 1 Hz: chip temperatures and LEON CPU usage.";
+CM_ BO_ 849 "Raw mode. 1 Hz: DDR (MB) and CMX (KB) memory.";
+CM_ BO_ 850 "Raw mode. 1 Hz: LEON CSS heap (KB).";
+CM_ BO_ 851 "Raw mode. 1 Hz: LEON MSS heap (KB).";
+CM_ BO_ 864 "Raw mode. Every 10 s: camera intrinsics in pixels of the network input size.";
+CM_ BO_ 865 "Raw mode. Every 10 s: stereo baseline, valid depth range, class count, confidence threshold.";
+CM_ BO_ 866 "Raw mode. Every 10 s: network input size, depth on/off, connected camera sockets bit mask (bit0=CAM_A...).";
+CM_ BO_ 880 "Raw mode. Every 10 s: text values in 5-character chunks. StrId 0=device id 1=product name 2=platform 3=bootloader 4=depthai version 5=model. Chunk k holds characters 5k..5k+4, TotalLen = text length.";
+CM_ SG_ 833 FrameType "ImgFrame type enum value.";
 BA_DEF_ "BusType" STRING ;
 BA_DEF_ BO_ "GenMsgCycleTime" INT 0 65535;
 BA_DEF_ BO_ "VFrameFormat" ENUM "StandardCAN","ExtendedCAN","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","StandardCAN_FD","ExtendedCAN_FD";
@@ -74,3 +187,18 @@ BA_ "GenMsgCycleTime" BO_ 800 1000;
 BA_ "VFrameFormat" BO_ 768 14;
 BA_ "VFrameFormat" BO_ 784 14;
 BA_ "VFrameFormat" BO_ 800 14;
+BA_ "VFrameFormat" BO_ 816 14;
+BA_ "VFrameFormat" BO_ 817 14;
+BA_ "VFrameFormat" BO_ 832 14;
+BA_ "VFrameFormat" BO_ 833 14;
+BA_ "VFrameFormat" BO_ 834 14;
+BA_ "VFrameFormat" BO_ 835 14;
+BA_ "VFrameFormat" BO_ 836 14;
+BA_ "VFrameFormat" BO_ 848 14;
+BA_ "VFrameFormat" BO_ 849 14;
+BA_ "VFrameFormat" BO_ 850 14;
+BA_ "VFrameFormat" BO_ 851 14;
+BA_ "VFrameFormat" BO_ 864 14;
+BA_ "VFrameFormat" BO_ 865 14;
+BA_ "VFrameFormat" BO_ 866 14;
+BA_ "VFrameFormat" BO_ 880 14;

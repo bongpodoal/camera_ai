@@ -73,3 +73,20 @@ def open_bus(interface, channel, **kw):
                 raise
         canlib.canIoCtlInit = tolerant
     return can.Bus(interface=interface, channel=channel, **kw)
+
+
+def make(name, **values):
+    """이름으로 메시지 만들기 (--raw on 의 추가 메시지용)."""
+    return _msg(name, values)
+
+
+def info_messages(str_id, text):
+    """문자열을 5글자씩 나눠 DEV_INFO 메시지 여러 개로 만든다 (최대 255자)."""
+    text = (text or "")[:255]
+    out = []
+    for k in range(0, max(len(text), 1), 5):
+        chunk = text[k:k + 5].ljust(5, "\0")
+        vals = dict(StrId=str_id, Chunk=(k // 5) % 16, TotalLen=len(text))
+        vals.update({f"C{i}": ord(c) for i, c in enumerate(chunk)})
+        out.append(_msg("DEV_INFO", vals))
+    return out

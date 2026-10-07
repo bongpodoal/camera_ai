@@ -17,10 +17,24 @@ OAK-D --이더넷--> 카메라 PC (can_demo.py) --CAN 500 kbps--> CANoe PC (받�
 | 과제 문장 | 이 폴더에서 |
 |---|---|
 | 카메라 출력 (CAN 수신) | `can_demo.py` 가 FRAME_STATUS·DET_BOX·PERF 송신 → CANoe Trace 에 표시·로그 |
-| Raw 화면 기준 인식 수준 (후처리) | `--raw on` 이 원본(AI 입력) 프레임에 박스를 그려 1초에 1장 저장 · `detections.csv` · `analyze.py` 의 검출 비율·평균 신뢰도·클래스별 개수 (**정답 비교 인식률은 아직 아님**) |
+| Raw 화면 기준 인식 수준 (후처리) | `--raw on` 이 처리된 RGB 프레임에 박스를 그려 1초에 1장(과 깊이 프레임 PNG) 저장 · `detections.csv` · `analyze.py` 의 검출 비율·평균 신뢰도·클래스별 개수 (**정답 비교 인식률은 아직 아님**) |
 | CAN 으로 AI 출력 결과 | `oakd_canoe.dbc` 를 CANoe 에 넣으면 이름·값으로 보임 |
-| Raw 수신 여부에 따른 연산/통신 속도, 3모델 | `run_matrix.sh` 가 3모델 × Raw 끔/켬 = 6번 → `compare.md` 의 FPS·지연·박스 그리기 시간·이더넷 MB/s·CAN 부하 |
+| Raw 수신 여부에 따른 연산/통신 속도, 3모델 | `run_matrix.sh` 가 3모델 × Raw 끔/켬 = 6번 → `compare.md` 의 FPS·지연·이더넷 MB/s·CAN 부하 변화. **Raw 켬 = 카메라로 받을 수 있는 모든 데이터** (아래 표) |
 | 시간축 (CAN 으로 다시 설정) | `t_axis_ms` = CANoe 수신 시각 · 카메라/PC 시계가 벌어지는 속도(ppm) 별도 보고 |
+
+> **바로 측정하려면 `MEASURE.md` 를 따라가면 된다** (점검 `preflight.py` → 60초 확인 → `run_matrix.sh`).
+
+## Raw 의 정의 (2026-10-07 교수님 설명으로 정정): "카메라로 받을 수 있는 모든 데이터를 다 받았을 때"
+| | Raw 끔 | **Raw 켬 (깊이 포함 모든 데이터)** |
+|---|---|---|
+| 칩에서 도는 것 | 검출망 | 검출망 + **스테레오 깊이 + 깊이 포함 검출망(SpatialDetectionNetwork)** + 시스템 로거 |
+| CAN 으로 | FRAME_STATUS · DET_BOX · PERF | 위 + DET_POS(X/Y/Z mm) · DET_ROI(깊이 ROI) · FRAME_META_A/B/C · FRAME_TIME_DEV/HOST · DEV_TEMP · DEV_MEM_A/B/C · CALIB_A/B/C · DEV_INFO |
+| 이더넷으로 (CAN 불가) | 검출 결과만 | 처리된 RGB 프레임 + 깊이 프레임 (크기를 세고 1초 1장 저장) |
+| 주기 | 프레임마다 | 프레임마다(메타·위치) · 1초(칩 상태) · 10초(보정·장치 정보) |
+
+- 범위는 지난 과제의 89개 파라미터(`example/07_host_output/params.py`)와 같다. 거리·방위각·면적비 등 **다른 값에서 계산되는 값은 받는 쪽에서 계산**하므로 따로 보내지 않는다. 보내지 않는 것: `lens_pos_raw`(고정초점이라 의미 없음), `angle_deg`(OBB 모델 전용), 파일 경로.
+- 로그에서 추가 메시지 풀기: `python3 extra_messages.py --log canoe.asc --out 추가메시지/` (메시지별 CSV, DEV_INFO 문자열 복원). `canoe_logger.py` 의 기존 CSV 는 그대로이고, 추가 메시지는 `canoe.asc` 에 이미 들어 있다.
+- 예상(미측정): 깊이 계산은 칩 부하가 커서 지난 과제에서 30 fps 면 프레임이 25% 누락됐다. 5 fps 에서는 괜찮을 것으로 보지만 **실측 필요**.
 
 | 파일 | 역할 |
 |---|---|
@@ -28,6 +42,9 @@ OAK-D --이더넷--> 카메라 PC (can_demo.py) --CAN 500 kbps--> CANoe PC (받�
 | `oakd_canoe_fd.dbc` | 같은 내용, 프레임 형식만 CAN FD (`--fd-frames` 로 보낼 때 사용) |
 | `can_msgs.py` | 인코딩/디코딩 |
 | `can_demo.py` (+`_no_comments`) | 카메라 → CAN 송신, 실행 기록 (`frames.csv`, `detections.csv`, `summary.csv`, `images/`) |
+| `oak_full.py` (+`_no_comments`) | `--raw on` 의 데이터 수집·CAN 메시지 변환 |
+| `extra_messages.py` (+`_no_comments`) | 로그에서 `--raw on` 추가 메시지를 CSV 로 풀기 |
+| `preflight.py` | 측정 전 점검 (패키지·DBC·카메라·모델 파일·CAN·이더넷 이름) |
 | `analyze.py` (+`_no_comments`) | CANoe 로그 + 실행 기록 → 시간축·드리프트·비교표 |
 | `canoe_sim.py` | CANoe 흉내 (로그 저장). CANoe 없는 곳에서 시험용 |
 | `canoe_logger.py` (+`_no_comments`) | **Windows 노트북 수신 로거** (CANoe 없이 측정용). `canoe.asc` 저장 → `FRAME_STATUS/DET_BOX/PERF.csv`(t_axis_ms) · `runs_summary.csv/md`(실행별 FPS·결번·지연·박스 수·CAN 부하). 실행 구분은 analyze.py 와 같은 규칙. `--idle-exit N` 으로 자동 종료, `--summarize DIR` 로 표 재생성 |

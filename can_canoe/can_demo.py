@@ -3,20 +3,24 @@
 
 흐름
     OAK-D --이더넷--> 이 프로그램 --CAN--> CANoe (받은 순간의 시각을 로그에 찍음 = 시간축)
-    --raw on  : 원본 영상(AI 입력 프레임)도 이더넷으로 받아 박스를 그리고 1초에 1장 저장 (후처리 확인용)
-    --raw off : 원본 영상은 칩 안에서 버린다 (이더넷으로 안 나옴). 결과(박스)만 받는다.
+    --raw on  : 카메라로 받을 수 있는 **모든 데이터**를 받는다 (교수님 정의). 깊이(스테레오)로 검출마다 X/Y/Z·ROI,
+                프레임 메타(노출·ISO·색온도·렌즈·크기·시각), 칩 온도·CPU·메모리(1초), 보정값·장치 정보(10초),
+                처리된 RGB 프레임과 깊이 프레임(이더넷, CAN 불가 → 크기만 셈). 숫자·문자열은 전부 CAN 으로 보낸다.
+    --raw off : 검출 결과(클래스·신뢰도·박스)만 받는다. 깊이·텔레메트리·영상은 받지 않고 칩 안에서 버린다.
 
 시간축은 CANoe 로그의 시각 하나다. 이 프로그램은 시각을 CAN 에 싣지 않고, 자기 기록에
     t_send_s (PC 시계로 보낸 시각) · dev_t_s (카메라 시계로 찍은 시각)
 만 남긴다. 둘이 CANoe 시계에서 얼마나 벌어지는지는 analyze.py 가 로그와 합쳐서 잰다.
 
 보내는 메시지 (oakd_canoe.dbc): FRAME_STATUS 프레임마다 · DET_BOX 검출마다 · PERF 1초마다
+    --raw on 추가: DET_POS·DET_ROI 검출마다 · FRAME_META_A/B/C·FRAME_TIME_DEV/HOST 프레임마다 · DEV_TEMP·DEV_MEM_A/B/C 1초 · CALIB_A/B/C·DEV_INFO 10초
 
 예) python3 can_demo.py --model yolov6n --raw on --interface socketcan --channel can0 --duration 300 --out-dir runs/1_yolov6n_on
     python3 can_demo.py --fake --interface virtual --channel t --duration 20 --out-dir /tmp/x   (카메라·CANoe 없이)
 """
 import argparse
 import csv
+import json
 import random
 import statistics
 import threading
@@ -26,9 +30,11 @@ from pathlib import Path
 
 import can
 
+import oak_full
 from can_msgs import BITS_PER_FRAME, MODEL_IDS, det_box, frame_status, open_bus, perf, set_fd_frames
 
 ROOT = Path(__file__).resolve().parents[1]
+DET_EXT_COLS = ('x_mm', 'y_mm', 'z_mm', 'roi_x', 'roi_y', 'roi_w', 'roi_h')
 ARCHIVES = {      # latency_latest.py 와 같은 모델 (yolov6n 은 공식 예제 이름)
     "yolov8n": "05_nnarchive/yolov8n/yolov8n-416x416.tar.xz",
     "traffic_light": "traffic_light/05_nnarchive/traffic_light-416x416.tar.xz",
@@ -58,7 +64,7 @@ class OakSource:
     """실제 OAK-D. 프레임마다 dict 하나를 내준다."""
 
     def __init__(self, args):
-        self.args, self.edge_by_seq, self.edge_queue = args, {}, None
+        self.args, self.edge_by_seq, self.edge_queue, self.session = args, {}, None, None
 
     def wait_edge(self, seq, timeout=0.25):
         """이 프레임의 칩 지연값이 올 때까지 최대 timeout 초 기다린다."""
@@ -68,29 +74,50 @@ class OakSource:
                 self.edge_by_seq[buf.getSequenceNum()] = float(bytes(buf.getData()).decode())
             time.sleep(0.01)
 
+    def _model(self, dai):
+        a = self.args
+        if a.model == "yolov6n":
+            return dai.NNModelDescription("yolov6-nano")
+        return dai.NNArchive(a.archive or str(ROOT / ARCHIVES[a.model]))
+
     def frames(self, stop):
         import cv2
         import depthai as dai
         a = self.args
-        if a.model == "yolov6n":
-            model = dai.NNModelDescription("yolov6-nano")
-        else:
-            model = dai.NNArchive(a.archive or str(ROOT / ARCHIVES[a.model]))
+        model = self._model(dai)
         device = dai.Device(dai.DeviceInfo(a.ip))
+        full = a.raw == "on"
         with dai.Pipeline(device) as pipeline:
-            camera = pipeline.create(dai.node.Camera).build()
-            network = pipeline.create(dai.node.DetectionNetwork).build(camera, model, fps=a.fps)
-            network.input.setMaxSize(1)           # 최신화 큐: AI 가 바쁘면 옛 프레임을 버린다
-            network.input.setBlocking(False)
-            print(f"설정: 카메라 {a.fps:g} fps 고정 · AI 입력 큐 크기 1 · 비차단(최신 프레임만) · 모델 {a.model} · raw {a.raw}")
+            if full:
+                # 모든 데이터: 스테레오 깊이 + 깊이 포함 검출망 (예제 07_host_output/edge_logger.py 와 같은 구성)
+                camera = pipeline.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
+                depth = pipeline.create(dai.node.Depth).build(dai.node.Depth.Algorithm.AUTO, a.fps)
+                network = pipeline.create(dai.node.SpatialDetectionNetwork).build(camera, depth, model, fps=a.fps)
+                network.setDepthLowerThreshold(100)
+                network.setDepthUpperThreshold(20000)
+                network.spatialLocationCalculator.initialConfig.setSegmentationPassthrough(False)
+            else:
+                camera = pipeline.create(dai.node.Camera).build()
+                network = pipeline.create(dai.node.DetectionNetwork).build(camera, model, fps=a.fps)
+            try:
+                network.input.setMaxSize(1)       # 최신화 큐: AI 가 바쁘면 옛 프레임을 버린다
+                network.input.setBlocking(False)
+            except AttributeError:
+                print("경고: 이 노드에는 input 큐 설정이 없어 최신화 큐를 적용하지 못함")
+            print(f"설정: 카메라 {a.fps:g} fps 고정 · AI 입력 큐 크기 1 · 비차단(최신 프레임만) · 모델 {a.model} · raw {a.raw}"
+                  f"{' (깊이·텔레메트리·영상 모두 받음)' if full else ''}")
             edge_script = pipeline.create(dai.node.Script)
             edge_script.setScript(EDGE_SCRIPT)
             network.out.link(edge_script.inputs["det"])
             det_queue = network.out.createOutputQueue()
             edge_queue = self.edge_queue = edge_script.outputs["edge"].createOutputQueue()
-            frame_queue = None
-            if a.raw == "on":
+            frame_queue = depth_queue = sys_queue = None
+            if full:
                 frame_queue = network.passthrough.createOutputQueue()
+                depth_queue = network.passthroughDepth.createOutputQueue(maxSize=2, blocking=False)
+                syslog = pipeline.create(dai.node.SystemLogger)
+                syslog.setRate(1.0)
+                sys_queue = syslog.out.createOutputQueue(maxSize=8, blocking=False)
             else:
                 drop = pipeline.create(dai.node.Script)
                 drop.setScript(DROP_SCRIPT)
@@ -100,8 +127,9 @@ class OakSource:
                 frame_msg = frame_queue.get() if frame_queue else None
                 det = det_queue.get()
                 t_pc = time.time()
-                total_ms = (dai.Clock.now() - det.getTimestamp()).total_seconds() * 1000
-                post_ms, raw_bytes, frame = 0.0, 0, None
+                now_dai = dai.Clock.now()
+                total_ms = (now_dai - det.getTimestamp()).total_seconds() * 1000
+                post_ms, raw_bytes, frame, extra = 0.0, 0, None, {}
                 if frame_msg is not None:
                     t0 = time.perf_counter()
                     frame = frame_msg.getCvFrame()
@@ -113,11 +141,22 @@ class OakSource:
                         cv2.putText(frame, f"{d.label} {d.confidence:.2f}", (p0[0], max(p0[1] - 4, 10)),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
                     post_ms = (time.perf_counter() - t0) * 1000
+                if full:
+                    depth_msgs = depth_queue.tryGetAll()
+                    depth_bytes = sum(int(m.getData().nbytes) for m in depth_msgs)
+                    if self.session is None:
+                        self.session = oak_full.session_info(device, dai, network, a.model, frame.shape[1], frame.shape[0])
+                    extra = dict(meta=oak_full.frame_meta(frame_msg, det, now_dai, now_dai),
+                                 ext=[oak_full.det_ext(d) for d in det.detections],
+                                 tele=[oak_full.telemetry_row(x) for x in sys_queue.tryGetAll()],
+                                 depth_bytes=depth_bytes, depth_frame=depth_msgs[-1].getFrame() if depth_msgs else None)
+                    raw_bytes += depth_bytes
                 for buf in edge_queue.tryGetAll():
                     self.edge_by_seq[buf.getSequenceNum()] = float(bytes(buf.getData()).decode())
                 yield dict(seq=det.getSequenceNum(), dev_t=det.getTimestampDevice().total_seconds(),
                            t_pc=t_pc, total_ms=total_ms, post_ms=post_ms, raw_bytes=raw_bytes, frame=frame,
-                           dets=[(d.label, d.confidence, d.xmin, d.ymin, d.xmax, d.ymax) for d in det.detections])
+                           dets=[(d.label, d.confidence, d.xmin, d.ymin, d.xmax, d.ymax) for d in det.detections],
+                           **extra)
             time.sleep(0.3)
             for buf in edge_queue.tryGetAll():
                 self.edge_by_seq[buf.getSequenceNum()] = float(bytes(buf.getData()).decode())
@@ -128,13 +167,14 @@ class FakeSource:
 
     def __init__(self, args):
         self.args, self.edge_by_seq = args, {}
+        self.session = oak_full.fake_session(args.model) if args.raw == "on" else None
 
     def wait_edge(self, seq, timeout=0.25):
         pass
 
     def frames(self, stop):
-        a, t0, seq = self.args, time.monotonic(), 0
-        raw_bytes = 512 * 288 * 3 if a.raw == "on" else 0
+        a, t0, seq, last_tele = self.args, time.monotonic(), 0, 0.0
+        full = a.raw == "on"
         while not stop.is_set():
             seq += 1
             true_t = time.monotonic() - t0
@@ -142,9 +182,16 @@ class FakeSource:
             self.edge_by_seq[seq] = edge
             dets = [(random.randrange(4), random.uniform(0.4, 0.95), 0.4, 0.1, 0.44, 0.26)
                     for _ in range(random.randrange(0, 4))]
+            extra = {}
+            if full:
+                tele = []
+                if true_t - last_tele >= 1.0:
+                    tele, last_tele = [oak_full.fake_telemetry()], true_t
+                extra = dict(meta=oak_full.fake_meta(seq), ext=[oak_full.fake_ext() for _ in dets], tele=tele,
+                             depth_bytes=640 * 400 * 2, depth_frame=None)
             yield dict(seq=seq, dev_t=1000 + true_t * (1 + a.fake_ppm * 1e-6), t_pc=time.time(),
-                       total_ms=edge + 8, post_ms=2.0 if a.raw == "on" else 0.0, raw_bytes=raw_bytes,
-                       frame=None, dets=dets)
+                       total_ms=edge + 8, post_ms=2.0 if full else 0.0,
+                       raw_bytes=(512 * 288 * 3 + 640 * 400 * 2) if full else 0, frame=None, dets=dets, **extra)
             time.sleep(max(0, t0 + seq / a.fps - time.monotonic()))
 
 
@@ -203,7 +250,7 @@ def main(argv=None):
     last_save, last_perf, nic_prev = 0.0, time.monotonic(), None
     recent = deque()                        # 최근 1초: (시각, seq, total_ms, post_ms, raw_bytes)
     tx_in_sec, fps_win, prev_seq = 0, deque(), None
-    det_rows = []
+    det_rows, tele_rows, last_session = [], [], -1e9
     t_start = time.monotonic()
     t_first = None                # 첫 프레임 도착 시각: --duration 은 여기서부터 잰다 (카메라 시작 지연 제외)
     nic0 = nic_prev = read_nic_bytes(a.nic) if a.nic else None
@@ -269,16 +316,30 @@ def main(argv=None):
             # CAN 송신: 프레임 요약 1개 + 검출 박스 (신뢰도 높은 순)
             f["t_send"] = time.time()
             send(frame_status(f["seq"], len(f["dets"]), fps, edge, min(max(gap, 0), 15), MODEL_IDS[a.model], a.raw == "on"))
-            top = sorted(f["dets"], key=lambda d: -d[1])[:min(a.max_dets, 16)]
-            for i, d in enumerate(top):
-                send(det_box(f["seq"], i, *d))
-            for d in f["dets"]:
-                det_rows.append([f["seq"], *d])
+            order = sorted(range(len(f["dets"])), key=lambda i: -f["dets"][i][1])[:min(a.max_dets, 16)]
+            for i, k in enumerate(order):
+                send(det_box(f["seq"], i, *f["dets"][k]))
+            ext = f.get("ext") or [{}] * len(f["dets"])
+            for d, e in zip(f["dets"], ext):
+                det_rows.append([f["seq"], *d, *(e.get(k, "") for k in DET_EXT_COLS)])
+            if a.raw == "on":                      # 카메라가 줄 수 있는 나머지 데이터 전부를 CAN 으로
+                for m in oak_full.frame_messages(f["seq"], f["meta"], order, f["ext"]):
+                    send(m)
+                for t in f["tele"]:
+                    tele_rows.append(t)
+                    for m in oak_full.telemetry_messages(t):
+                        send(m)
+                if source.session is not None and now - last_session >= 10.0:
+                    last_session = now
+                    for m in oak_full.session_messages(source.session):
+                        send(m)
             if f["frame"] is not None and now - last_save >= a.save_every:
                 import cv2
                 cv2.imwrite(str(out / "images" / f"{f['seq']:06d}.jpg"), f["frame"])
+                if f.get("depth_frame") is not None:
+                    cv2.imwrite(str(out / "images" / f"{f['seq']:06d}_depth.png"), f["depth_frame"])   # 16비트 깊이(mm)
                 last_save = now
-            f["frame"] = None
+            f["frame"] = f["depth_frame"] = None
             f["n_det"] = len(f["dets"])
             rows.append(f)
             with lock:
@@ -298,18 +359,25 @@ def main(argv=None):
     # ---- 기록 저장 ----
     with open(out / "frames.csv", "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["model", "raw", "seq", "t_send_s", "dev_t_s", "edge_ms", "pc_ms", "post_ms", "raw_bytes", "n_objects"])
+        w.writerow(["model", "raw", "seq", "t_send_s", "dev_t_s", "edge_ms", "pc_ms", "post_ms", "raw_bytes", "depth_bytes", "n_objects"])
         for r in rows:
             edge = source.edge_by_seq.get(r["seq"])
             w.writerow([a.model, a.raw, r["seq"], f"{r['t_send']:.6f}", f"{r['dev_t']:.6f}",
                         edge if edge is not None else "",
                         round(r["total_ms"] - edge, 2) if edge is not None else "",
-                        round(r["post_ms"], 2), r["raw_bytes"], r["n_det"]])
+                        round(r["post_ms"], 2), r["raw_bytes"], r.get("depth_bytes", 0), r["n_det"]])
     with open(out / "detections.csv", "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["seq", "label", "confidence", "xmin", "ymin", "xmax", "ymax"])
+        w.writerow(["seq", "label", "confidence", "xmin", "ymin", "xmax", "ymax", *DET_EXT_COLS])
         w.writerows(det_rows)
 
+    if tele_rows:
+        with open(out / "telemetry.csv", "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(tele_rows[0]))
+            w.writeheader()
+            w.writerows(tele_rows)
+    if source.session is not None:
+        (out / "session.json").write_text(json.dumps(source.session, indent=1, ensure_ascii=False), encoding="utf-8")
     edges = [source.edge_by_seq[r["seq"]] for r in rows if r["seq"] in source.edge_by_seq]
     pcs = [r["total_ms"] - source.edge_by_seq[r["seq"]] for r in rows if r["seq"] in source.edge_by_seq]
     eth = (nic1 - nic0) / dur if nic0 is not None and nic1 is not None else sum(r["raw_bytes"] for r in rows) / dur

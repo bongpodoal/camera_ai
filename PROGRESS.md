@@ -210,3 +210,23 @@ CAN으로 받을 수 있는지 확인하고, 파라미터 50개 이상을 추출
 | 결론 | 지난 과제 지적(카메라 시계를 시간축으로 쓰면 오차가 누적)의 정량 근거. 시간축은 VN1630A 수신 시각 하나로 통일 |
 | 사용자 결정 | 첫 PERF 제외 규칙 제거 승인 → Windows 로거에서 제거 요청함 (표본 3개 −0.4/0.0/+0.1 ms) |
 | 대기 | Windows 로거 수정·`results/can_canoe/20261007/` 커밋·푸시는 사용자 지시 후. `can_demo` seconds 보정, Raw 켬 시험, 인식률은 미완 |
+
+## 2026-10-07 (추가 14) — Raw 정의 정정: "카메라로 받을 수 있는 모든 데이터" (깊이 포함)
+
+| 항목 | 내용 |
+|---|---|
+| 정정 | 교수님 설명: Raw = 카메라로 받을 수 있는 모든 데이터를 받았을 때를 측정 (깊이 포함, 영상 아님). 이전 `--raw on`(원본 영상만 저장)은 이 정의와 달라 교체 |
+| Raw 켬 | 스테레오 깊이 + SpatialDetectionNetwork + SystemLogger. CAN: DET_POS·DET_ROI·FRAME_META_A/B/C·FRAME_TIME_DEV/HOST(프레임), DEV_TEMP·DEV_MEM_A/B/C(1초), CALIB_A/B/C·DEV_INFO(10초). 이더넷: RGB·깊이 프레임(크기만 셈, 1초 1장 저장) |
+| DBC | `oakd_canoe.dbc`·`oakd_canoe_fd.dbc` 에 14개 메시지 추가 (0x330~0x370). 기존 OAKD_EdgeRaw DBC 는 없음(없어도 됨, 우리가 정의) |
+| 코드 | `oak_full.py`(수집·변환), `can_demo.py`(`--raw on` 교체, telemetry.csv·session.json·깊이 PNG), `extra_messages.py`(로그에서 추가 메시지 풀기) |
+| 검증 | 맥 selftest 통과 (가상 CAN: 추가 메시지 개수 일치, 장치 ID 문자열 복원, Raw 켬 CAN 부하 3.0% vs 끔 0.7%) |
+| 미검증 | 실카메라 깊이 파이프라인(NNArchive 416×416 + SpatialDetectionNetwork, 최신화 큐 적용 여부), 5 fps 에서의 칩 부하·지연, 실제 로그 |
+
+## 2026-10-07 (추가 15) — Raw 켬 측정 준비 완료
+
+| 항목 | 내용 |
+|---|---|
+| 문서 | `can_canoe/MEASURE.md`: 양쪽 준비 → 점검 → YOLO11s 60초 확인 → 6회 본 측정 → 정리, 합격 기준·대처·알려진 위험 |
+| 도구 | `preflight.py`(패키지·DBC·ping·모델 파일·CAN·NIC 점검), `run_matrix.sh` 에 `MODELS`·`RAWS` 선택·완료 안내 추가 |
+| 5 fps 전망 | yolov6n·v8n 여유 큼(과거: 깊이 켬 20 fps 정상), YOLO11s 는 추정 한계 5.7~8.2 fps (모델 한계 9.75 fps + 깊이 오버헤드 추정) → 첫 60초 확인 필수 |
+| 상태 | 맥 selftest 통과. 실카메라·실로거 미검증. 장비 세팅 후 사용자 지시로 측정 |
