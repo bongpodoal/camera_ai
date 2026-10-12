@@ -133,3 +133,7 @@ run_matrix.sh 는 기본이 **클래식 CAN 500 kbps** (FD=0, FD_FRAMES=0, 2026-
 | 실제 카메라 경로 (`OakSource`, `--raw off` 의 칩 위 버림 Script) | **미검증** (카메라 PC 필요) |
 | 실제 CANoe 에서 DBC 로드·Logging·`.asc` 읽기 | **미검증** (CANoe 필요. 읽기는 python-can 의 LogReader 사용 — CANoe 가 만든 `.asc`/`.blf` 로 확인 필요) |
 | 인식률(정답 비교) | 아직 안 함 (나중에 별도 논의) |
+
+## 송출 데이터 정리 엑셀 (교수님 요청)
+`python dbc_to_excel.py [출력.xlsx] [--fps 5]` — DBC 에서 변수명·의미·변수형·길이·업데이트 주기·CANdb(50 ms, ID, 시작/끝 byte)를
+엑셀로 만든다. 시트 ① 영상 미송출(CAN 88개 변수), ② 영상 송출(영상 항목은 이더넷 전용, CAN 으로 보낼 때 프레임 수·시간 계산).
