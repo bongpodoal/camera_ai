@@ -8,17 +8,29 @@ DepthAI v3 는 RVC2 의 standalone(플래시 후 전원만으로 자동 실행)�
 """
 import depthai as dai
 
+# 2026-10-12 수정: ⓪ v2 Script 의 검출 메시지에는 getTimestampDevice() 가 없고 getTimestamp() 가 칩 시계(Clock.now()와 같은 시계)다 → 칩 지연은 Clock.now() - det.getTimestamp()
+#                   ① 칩 Script 는 기본 LEON_MSS 에서 돌고 거기엔 socket 이 없다 → setProcessor(LEON_CSS) 필요
+#                   ② 전원 직후에는 네트워크가 아직 안 올라와 첫 sendto 가 예외를 내고, 예외가 나면 Script 와 앱이 같이 죽어 부트로더로 돌아간다 → try/except 로 재시도
 SCRIPT = """
 import socket, time, json
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 dest = ("{ip}", {port})
+sock = None
 n = 0
 while True:
     det = node.io['det'].get()
     n += 1
     d = [[x.label, round(x.confidence, 3), round(x.xmin, 4), round(x.ymin, 4), round(x.xmax, 4), round(x.ymax, 4)] for x in det.detections]
-    lat = (Clock.now() - det.getTimestampDevice()).total_seconds() * 1000
-    sock.sendto(json.dumps({{"n": n, "lat_ms": round(lat, 1), "d": d}}).encode(), dest)
+    try:
+        lat = (Clock.now() - det.getTimestamp()).total_seconds() * 1000
+    except Exception:
+        lat = -1.0
+    try:
+        if sock is None:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.sendto(json.dumps({{"n": n, "lat_ms": round(lat, 1), "d": d}}).encode(), dest)
+    except Exception as e:
+        node.warn("send err " + repr(e))
+        sock = None
 """
 
 
@@ -42,6 +54,7 @@ def build(blob_path, dest_ip, dest_port=5005, width=416, height=416, num_classes
     nn.input.setQueueSize(1)        # 최신화 큐: 칩 안에서 프레임이 쌓이지 않게
     cam.preview.link(nn.input)
     script = p.create(dai.node.Script)
+    script.setProcessor(dai.ProcessorType.LEON_CSS)   # socket 모듈은 LEON_CSS 에서만 있다
     script.setScript(SCRIPT.format(ip=dest_ip, port=dest_port))
     nn.out.link(script.inputs["det"])
     script.inputs["det"].setBlocking(False)

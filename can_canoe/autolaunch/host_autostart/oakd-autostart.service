@@ -1,0 +1,20 @@
+[Unit]
+Description=OAK-D 검출 결과를 CAN 으로 송신 (부팅 시 자동 실행)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+EnvironmentFile=-/etc/default/oakd-autostart
+Environment=REPO=@REPO@
+Environment=PY=@PY@
+Environment=OUT_BASE=@OUT_BASE@
+# CAN 인터페이스를 올리려면 root 권한이 필요해서 이 한 줄만 root 로 실행한다
+ExecStartPre=+/bin/sh -c 'ip link show ${CAN_IF:-can0} >/dev/null 2>&1 && (ip link show ${CAN_IF:-can0} | grep -q UP || ip link set ${CAN_IF:-can0} up type can bitrate ${CAN_BITRATE:-500000}) || true'
+ExecStart=@REPO@/can_canoe/autolaunch/host_autostart/run_oakd.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
