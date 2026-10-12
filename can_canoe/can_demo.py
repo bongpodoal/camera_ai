@@ -49,10 +49,22 @@ ARCHIVES_FULL = {
 }
 # 칩 위 코드 ① 엣지 지연 재기 (칩 시계끼리 뺀다. getTimestamp() 는 펌웨어 크래시라 쓰지 않는다)
 EDGE_SCRIPT = """
+warned = False
 while True:
     det = node.inputs['det'].get()
-    edge = Clock.now() - det.getTimestampDevice()
-    data = str(round(edge.total_seconds() * 1000, 3)).encode()
+    ts = det.getTimestampDevice()
+    try:
+        t = ts.total_seconds()                  # DetectionNetwork: timedelta
+    except Exception:
+        try:
+            t = ts.sec + ts.nsec * 1e-9         # SpatialDetectionNetwork(Raw 켬): lpb.Timestamp
+        except Exception:
+            if not warned:
+                node.warn('timestamp fields: ' + str(dir(ts)))
+                warned = True
+            continue
+    edge_ms = (Clock.now().total_seconds() - t) * 1000
+    data = str(round(edge_ms, 3)).encode()
     buf = Buffer(len(data))
     buf.setData(data)
     buf.setSequenceNum(det.getSequenceNum())

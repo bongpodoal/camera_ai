@@ -26,10 +26,22 @@ ARCHIVES_FULL = {
     "traffic_light_v8n": "traffic_light/05_nnarchive/traffic_light_v8n-416x416-6shave.tar.xz",
 }
 EDGE_SCRIPT = """
+warned = False
 while True:
     det = node.inputs['det'].get()
-    edge = Clock.now() - det.getTimestampDevice()
-    data = str(round(edge.total_seconds() * 1000, 3)).encode()
+    ts = det.getTimestampDevice()
+    try:
+        t = ts.total_seconds()
+    except Exception:
+        try:
+            t = ts.sec + ts.nsec * 1e-9
+        except Exception:
+            if not warned:
+                node.warn('timestamp fields: ' + str(dir(ts)))
+                warned = True
+            continue
+    edge_ms = (Clock.now().total_seconds() - t) * 1000
+    data = str(round(edge_ms, 3)).encode()
     buf = Buffer(len(data))
     buf.setData(data)
     buf.setSequenceNum(det.getSequenceNum())
