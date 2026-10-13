@@ -1,0 +1,17 @@
+﻿메시지,ID_hex,ID_dec,DLC,송신,수신,DBC_GenMsgCycleTime_ms,업데이트_주기,신호_수,메시지_설명,A_Raw켬_영상송출,B_Raw끔_영상미송출,C_Raw켬_영상미송출,D_Raw끔_영상송출
+FRAME_STATUS,0x300,768,8,CAM_PC,CANOE,0,프레임마다(5 fps = 200 ms),7,프레임당 1개. 카메라 프레임 상태,O,O,O,O
+DET_BOX,0x310,784,8,CAM_PC,CANOE,0,"검출마다(프레임당 최대 8개, 200 ms에 묶음)",8,검출 하나당 1개. 박스 중심·크기는 0~1 정규화,O,O,O,O
+PERF,0x320,800,8,CAM_PC,CANOE,1000,1초,5,성능 요약(1초마다),O,O,O,O
+FRAME_META_A,0x340,832,8,CAM_PC,CANOE,0,프레임마다(200 ms),4,"프레임 메타 A: 노출, ISO, 색온도",O,X,O,X
+FRAME_META_B,0x341,833,8,CAM_PC,CANOE,0,프레임마다(200 ms),6,"프레임 메타 B: 렌즈, 원본 크기, 카메라 번호, 형식",O,X,O,X
+FRAME_META_C,0x342,834,8,CAM_PC,CANOE,0,프레임마다(200 ms),5,"프레임 메타 C: 출력 크기, 화각",O,X,O,X
+FRAME_TIME_DEV,0x343,835,8,CAM_PC,CANOE,0,프레임마다(200 ms),3,장치 시각과 검출 지연,O,X,O,X
+FRAME_TIME_HOST,0x344,836,8,CAM_PC,CANOE,0,프레임마다(200 ms),3,호스트 시각과 프레임 지연,O,X,O,X
+DEV_TEMP,0x350,848,8,CAM_PC,CANOE,0,1초,7,칩 온도와 CPU 사용률,O,X,O,X
+DEV_MEM_A,0x351,849,8,CAM_PC,CANOE,0,1초,4,DDR·CMX 메모리,O,X,O,X
+DEV_MEM_B,0x352,850,8,CAM_PC,CANOE,0,1초,2,LEON CSS 힙,O,X,O,X
+DEV_MEM_C,0x353,851,8,CAM_PC,CANOE,0,1초,2,LEON MSS 힙,O,X,O,X
+CALIB_A,0x360,864,8,CAM_PC,CANOE,0,10초,4,RGB 카메라 초점거리·주점,O,X,O,X
+CALIB_B,0x361,865,8,CAM_PC,CANOE,0,10초,2,클래스 수·신뢰도 문턱(깊이 변수 제외),O,X,O,X
+CALIB_C,0x362,866,8,CAM_PC,CANOE,0,10초,3,신경망 입력 크기·카메라 구성(깊이 플래그 제외),O,X,O,X
+DEV_INFO,0x370,880,8,CAM_PC,CANOE,0,10초(문자열 조각 15개 묶음),8,장치·모델 문자열(5글자 조각),O,X,O,X

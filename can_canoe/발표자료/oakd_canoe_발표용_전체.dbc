@@ -1,0 +1,162 @@
+VERSION "1.0"
+
+
+NS_ :
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	BA_DEF_DEF_
+
+BS_:
+
+BU_: CAM_PC CANOE
+
+
+BO_ 768 FRAME_STATUS: 8 CAM_PC
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" CANOE
+ SG_ DetCount : 16|8@1+ (1,0) [0|255] "" CANOE
+ SG_ Fps : 24|16@1+ (0.1,0) [0|6553.5] "fps" CANOE
+ SG_ EdgeMs : 40|12@1+ (1,0) [0|4095] "ms" CANOE
+ SG_ SeqGap : 52|4@1+ (1,0) [0|15] "" CANOE
+ SG_ ModelId : 56|4@1+ (1,0) [0|15] "" CANOE
+ SG_ RawOn : 60|1@1+ (1,0) [0|1] "" CANOE
+
+BO_ 784 DET_BOX: 8 CAM_PC
+ SG_ SeqLo : 0|4@1+ (1,0) [0|15] "" CANOE
+ SG_ Index : 4|4@1+ (1,0) [0|15] "" CANOE
+ SG_ Label : 8|7@1+ (1,0) [0|127] "" CANOE
+ SG_ Conf : 15|7@1+ (0.01,0) [0|1.27] "" CANOE
+ SG_ Cx : 22|10@1+ (0.001,0) [0|1.023] "" CANOE
+ SG_ Cy : 32|10@1+ (0.001,0) [0|1.023] "" CANOE
+ SG_ W : 42|10@1+ (0.001,0) [0|1.023] "" CANOE
+ SG_ H : 52|10@1+ (0.001,0) [0|1.023] "" CANOE
+
+BO_ 800 PERF: 8 CAM_PC
+ SG_ PcMs : 0|12@1+ (0.1,0) [0|409.5] "ms" CANOE
+ SG_ PostMs : 12|12@1+ (0.1,0) [0|409.5] "ms" CANOE
+ SG_ EthKBps : 24|16@1+ (1,0) [0|65535] "KB/s" CANOE
+ SG_ CanLoadPct : 40|8@1+ (0.5,0) [0|127.5] "%" CANOE
+ SG_ DroppedTotal : 48|16@1+ (1,0) [0|65535] "" CANOE
+
+BO_ 832 FRAME_META_A: 8 CAM_PC
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" CANOE
+ SG_ ExposureUs : 16|20@1+ (1,0) [0|1048575] "us" CANOE
+ SG_ Iso : 36|12@1+ (1,0) [0|4095] "" CANOE
+ SG_ ColorTempK : 48|14@1+ (1,0) [0|16383] "K" CANOE
+
+BO_ 833 FRAME_META_B: 8 CAM_PC
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" CANOE
+ SG_ LensPos : 16|10@1- (1,0) [-512|511] "" CANOE
+ SG_ SourceW : 26|13@1+ (1,0) [0|8191] "px" CANOE
+ SG_ SourceH : 39|13@1+ (1,0) [0|8191] "px" CANOE
+ SG_ CamInstance : 52|4@1+ (1,0) [0|15] "" CANOE
+ SG_ FrameType : 56|8@1+ (1,0) [0|255] "" CANOE
+
+BO_ 834 FRAME_META_C: 8 CAM_PC
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" CANOE
+ SG_ FrameW : 16|13@1+ (1,0) [0|8191] "px" CANOE
+ SG_ FrameH : 29|13@1+ (1,0) [0|8191] "px" CANOE
+ SG_ HfovDeg : 42|11@1+ (0.1,0) [0|204.7] "deg" CANOE
+ SG_ VfovDeg : 53|11@1+ (0.1,0) [0|204.7] "deg" CANOE
+
+BO_ 835 FRAME_TIME_DEV: 8 CAM_PC
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" CANOE
+ SG_ TsDeviceUs : 16|32@1+ (1,0) [0|4294967295] "us" CANOE
+ SG_ DetLatencyMs : 48|16@1+ (0.1,0) [0|6553.5] "ms" CANOE
+
+BO_ 836 FRAME_TIME_HOST: 8 CAM_PC
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" CANOE
+ SG_ TsHostUs : 16|32@1+ (1,0) [0|4294967295] "us" CANOE
+ SG_ FrameLatencyMs : 48|16@1+ (0.1,0) [0|6553.5] "ms" CANOE
+
+BO_ 848 DEV_TEMP: 8 CAM_PC
+ SG_ TempCss : 0|8@1+ (0.5,-40) [-40|87.5] "degC" CANOE
+ SG_ TempMss : 8|8@1+ (0.5,-40) [-40|87.5] "degC" CANOE
+ SG_ TempUpa : 16|8@1+ (0.5,-40) [-40|87.5] "degC" CANOE
+ SG_ TempDss : 24|8@1+ (0.5,-40) [-40|87.5] "degC" CANOE
+ SG_ TempAvg : 32|8@1+ (0.5,-40) [-40|87.5] "degC" CANOE
+ SG_ CpuCssPct : 40|8@1+ (0.5,0) [0|127.5] "%" CANOE
+ SG_ CpuMssPct : 48|8@1+ (0.5,0) [0|127.5] "%" CANOE
+
+BO_ 849 DEV_MEM_A: 8 CAM_PC
+ SG_ DdrUsedMB : 0|16@1+ (0.1,0) [0|6553.5] "MB" CANOE
+ SG_ DdrTotalMB : 16|16@1+ (0.1,0) [0|6553.5] "MB" CANOE
+ SG_ CmxUsedKB : 32|16@1+ (0.1,0) [0|6553.5] "KB" CANOE
+ SG_ CmxTotalKB : 48|16@1+ (0.1,0) [0|6553.5] "KB" CANOE
+
+BO_ 850 DEV_MEM_B: 8 CAM_PC
+ SG_ CssHeapUsedKB : 0|32@1+ (1,0) [0|4294967295] "KB" CANOE
+ SG_ CssHeapTotalKB : 32|32@1+ (1,0) [0|4294967295] "KB" CANOE
+
+BO_ 851 DEV_MEM_C: 8 CAM_PC
+ SG_ MssHeapUsedKB : 0|32@1+ (1,0) [0|4294967295] "KB" CANOE
+ SG_ MssHeapTotalKB : 32|32@1+ (1,0) [0|4294967295] "KB" CANOE
+
+BO_ 864 CALIB_A: 8 CAM_PC
+ SG_ Fx : 0|16@1+ (0.1,0) [0|6553.5] "px" CANOE
+ SG_ Fy : 16|16@1+ (0.1,0) [0|6553.5] "px" CANOE
+ SG_ Cx : 32|16@1+ (0.1,0) [0|6553.5] "px" CANOE
+ SG_ Cy : 48|16@1+ (0.1,0) [0|6553.5] "px" CANOE
+
+BO_ 865 CALIB_B: 8 CAM_PC
+ SG_ NClasses : 48|8@1+ (1,0) [0|255] "" CANOE
+ SG_ ConfThresholdPct : 56|8@1+ (1,0) [0|255] "%" CANOE
+
+BO_ 866 CALIB_C: 8 CAM_PC
+ SG_ NnInputW : 0|16@1+ (1,0) [0|65535] "px" CANOE
+ SG_ NnInputH : 16|16@1+ (1,0) [0|65535] "px" CANOE
+ SG_ CameraMask : 33|8@1+ (1,0) [0|255] "" CANOE
+
+BO_ 880 DEV_INFO: 8 CAM_PC
+ SG_ StrId : 0|4@1+ (1,0) [0|15] "" CANOE
+ SG_ Chunk : 4|4@1+ (1,0) [0|15] "" CANOE
+ SG_ TotalLen : 8|8@1+ (1,0) [0|255] "" CANOE
+ SG_ C0 : 16|8@1+ (1,0) [0|255] "" CANOE
+ SG_ C1 : 24|8@1+ (1,0) [0|255] "" CANOE
+ SG_ C2 : 32|8@1+ (1,0) [0|255] "" CANOE
+ SG_ C3 : 40|8@1+ (1,0) [0|255] "" CANOE
+ SG_ C4 : 48|8@1+ (1,0) [0|255] "" CANOE
+
+CM_ "OAK-D CAM01 classic CAN 500 kbps, Raw On messages (16 messages, 73 signals), depth and lane excluded";
+CM_ BU_ CAM_PC "PC that reads the OAK-D over Ethernet and sends the results on CAN.";
+CM_ BU_ CANOE "CANoe / CAN logger. Its trace time stamp is the single time axis.";
+CM_ BO_ 768 "One per processed camera frame (every 200 ms at 5 fps). Seq links this frame to DET_BOX.SeqLo.";
+CM_ SG_ 768 Seq "Camera frame sequence number modulo 65536.";
+CM_ SG_ 768 EdgeMs "Latency inside the camera chip. 0 = no value.";
+CM_ SG_ 768 SeqGap "Frames skipped since the previous message, saturates at 15.";
+CM_ SG_ 768 ModelId "Model number, see value table.";
+CM_ SG_ 768 RawOn "0=Raw Off (detection results only), 1=Raw On.";
+CM_ BO_ 784 "One per detection, top N by confidence, Index 0 = highest. Box center and size normalized 0..1.";
+CM_ SG_ 784 SeqLo "Low 4 bits of FRAME_STATUS.Seq.";
+CM_ SG_ 784 Index "Box number within the frame (0 = highest confidence).";
+CM_ SG_ 784 Label "Class number. a_yolom_n: car=1 (measured); person=0, tl_red=2, tl_green=3, tl_yellow=4 are assumed and must be confirmed.";
+CM_ SG_ 784 Conf "Confidence 0..1 as reported by the camera, not an accuracy.";
+CM_ BO_ 800 "Performance summary, once per second.";
+CM_ SG_ 800 PostMs "Time to draw boxes on the raw image. 0 when Raw Off.";
+CM_ SG_ 800 EthKBps "Bytes received from the camera over Ethernet per second (KB).";
+CM_ SG_ 800 CanLoadPct "Estimated CAN bus load, worst case bit stuffing.";
+CM_ SG_ 800 DroppedTotal "Total frames dropped by the camera input queue since start.";
+CM_ BO_ 832 "Raw On. Per frame: exposure, ISO, color temperature.";
+CM_ BO_ 833 "Raw On. Per frame: lens position (-1 = fixed focus), sensor size, camera socket, pixel format code.";
+CM_ BO_ 834 "Raw On. Per frame: size of the image the network processed, field of view.";
+CM_ BO_ 835 "Raw On. Per frame: capture time on the camera clock (us, wraps at 71.6 min) and capture-to-detection latency.";
+CM_ BO_ 836 "Raw On. Per frame: capture time synced to the host clock (us, wraps) and capture-to-frame latency.";
+CM_ BO_ 848 "Raw On. 1 Hz: chip temperatures and LEON CPU usage.";
+CM_ BO_ 849 "Raw On. 1 Hz: DDR (MB) and CMX (KB) memory.";
+CM_ BO_ 850 "Raw On. 1 Hz: LEON CSS heap (KB).";
+CM_ BO_ 851 "Raw On. 1 Hz: LEON MSS heap (KB).";
+CM_ BO_ 864 "Raw On. Every 10 s: RGB camera intrinsics in pixels of the network input size.";
+CM_ BO_ 865 "Raw On. Every 10 s: class count and confidence threshold.";
+CM_ BO_ 866 "Raw On. Every 10 s: network input size and connected camera sockets bit mask (bit0=CAM_A).";
+CM_ BO_ 880 "Raw On. Every 10 s: text values in 5-character chunks (StrId 0=device id 1=product name 2=platform 3=bootloader 4=depthai version 5=model; chunk k holds chars 5k..5k+4).";
+BA_DEF_ "BusType" STRING ;
+BA_DEF_ BO_ "GenMsgCycleTime" INT 0 65535;
+BA_DEF_DEF_ "BusType" "CAN";
+BA_DEF_DEF_ "GenMsgCycleTime" 0;
+BA_ "BusType" "CAN";
+BA_ "GenMsgCycleTime" BO_ 800 1000;
+VAL_ 768 RawOn 1 "Raw_On" 0 "Raw_Off" ;
+VAL_ 768 ModelId 5 "a_yolom_n" 4 "traffic_light_v8n" 3 "traffic_light_11n" 2 "traffic_light" 1 "yolov8n" 0 "yolov6n" ;
+VAL_ 880 StrId 5 "model" 4 "depthai_version" 3 "bootloader" 2 "platform" 1 "product_name" 0 "device_id" ;
