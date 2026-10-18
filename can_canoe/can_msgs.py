@@ -12,7 +12,7 @@ HERE = Path(__file__).resolve().parent
 DB = cantools.database.load_file(str(HERE / "oakd_canoe.dbc"))
 MSG = {m.name: m for m in DB.messages}
 ID_FRAME, ID_DET, ID_PERF = (MSG[n].frame_id for n in ("FRAME_STATUS", "DET_BOX", "PERF"))
-MODEL_IDS = {"yolov6n": 0, "yolov8n": 1, "traffic_light": 2, "traffic_light_11n": 3, "traffic_light_v8n": 4}
+MODEL_IDS = {"yolov6n": 0, "yolov8n": 1, "traffic_light": 2, "traffic_light_11n": 3, "traffic_light_v8n": 4, "a_yolom_n": 5}
 MODEL_NAMES = {v: k for k, v in MODEL_IDS.items()}
 BITS_PER_FRAME = 135        # 11비트 ID + 8바이트 데이터, 비트 스터핑 최악 근사
 
@@ -45,6 +45,13 @@ def frame_status(seq, det_count, fps, edge_ms, seq_gap, model_id, raw_on):
 def det_box(seq, index, label, conf, xmin, ymin, xmax, ymax):
     return _msg("DET_BOX", dict(SeqLo=seq % 16, Index=index, Label=label, Conf=conf,
                                 Cx=(xmin + xmax) / 2, Cy=(ymin + ymax) / 2, W=xmax - xmin, H=ymax - ymin))
+
+
+def seg_summary(seq, lane, da):
+    """A-YOLOM 의 차선·주행영역 프레임 요약. lane, da = (present 0/1, conf 0~100 또는 None, area_pct 0~100).
+    마스크 자체는 CAN 에 싣지 않는다. conf 가 None(v3 같은 임계값 끝난 출력)이면 0 으로 보낸다."""
+    return _msg("SEG_SUMMARY", dict(Seq=seq % 65536, LanePresent=lane[0], DaPresent=da[0],
+                                    LaneConf=lane[1] or 0, LaneAreaPct=lane[2], DaConf=da[1] or 0, DaAreaPct=da[2]))
 
 
 def perf(pc_ms, post_ms, eth_kbps, can_load_pct, dropped_total):

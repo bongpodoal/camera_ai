@@ -11,12 +11,15 @@
 import argparse
 import json
 import statistics
+import sys
 import tarfile
 import tempfile
 import time
 from pathlib import Path
 
 import numpy as np
+
+from measure_log import LOG_DIR, append_row, git_state, link_mbps, now_iso, sha256_short
 
 
 def wrap_blob(blob_path, width, height):
@@ -50,9 +53,14 @@ def main():
     ap.add_argument("--n", type=int, default=200, help="잴 장수")
     ap.add_argument("--warmup", type=int, default=20)
     ap.add_argument("--inflight", type=int, default=2, help="처리량 측정에서 동시에 칩에 넣어 둘 장수")
-    ap.add_argument("--out", help="결과를 한 줄 CSV 로 덧붙일 파일")
+    ap.add_argument("--threads", type=int, default=0, help="NeuralNetwork 추론 스레드 수 (0 = 기본값). 1 이면 한 장이 SHAVE 를 모두 써서 지연이 줄 수 있다")
+    ap.add_argument("--depth", type=float, default=0, help="0 이 아니면 스테레오 깊이를 이 fps 로 같이 돌려 칩 부하를 겹친다 (깊이 켬 시험, SHAVE 7개만 남음)")
+    ap.add_argument("--out", default=str(LOG_DIR / "chip_bench_log.csv"), help="결과를 한 줄 CSV 로 덧붙일 파일 (기본: can_canoe/runs/chip_bench_log.csv, 시작 시각·링크 속도·블롭 SHA 등 포함)")
+    ap.add_argument("--nic", default="enp6s0", help="링크 속도를 읽을 이더넷 이름")
+    ap.add_argument("--tag", default="", help="결과 행에 붙일 메모")
     a = ap.parse_args()
 
+    start_time, link0 = now_iso(), link_mbps(a.nic)
     import depthai as dai
     archive_path, blob = wrap_blob(Path(a.blob).expanduser(), a.width, a.height)
     img = (np.random.rand(a.height, a.width, 3) * 255).astype(np.uint8)
@@ -66,7 +74,17 @@ def main():
     with dai.Pipeline(device) as pipeline:
         net = pipeline.create(dai.node.NeuralNetwork)
         net.setNNArchive(dai.NNArchive(str(archive_path)))
+        if a.threads:
+            net.setNumInferenceThreads(a.threads)
         in_q = net.input.createInputQueue()
+        if a.depth:
+            sys.path.insert(0, str(Path(__file__).resolve().parents[1]))                 # oak_full 등 can_canoe 모듈
+            sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "a_yolom"))
+            from a_yolom_source import make_stereo_depth          # 명시적 StereoDepth (Depth 노드 자동 쌍 감지 실패 대체)
+            from a_yolom_source import use_factory_calibration
+            use_factory_calibration(pipeline, device)                    # 저장 보정이 틀어져 있어 공장 보정 사용
+            depth = make_stereo_depth(pipeline, dai, a.depth, a.width, a.height)
+            depth_q = depth.depth.createOutputQueue(maxSize=2, blocking=False)   # 받아서 버린다 (깊이가 계속 돌게)
         out_q = net.out.createOutputQueue()
         pipeline.start()
         for _ in range(a.warmup):
@@ -89,13 +107,12 @@ def main():
         fps = a.n / (time.perf_counter() - t0)
     med = statistics.median(lat)
     p95 = sorted(lat)[int(len(lat) * 0.95) - 1]
-    print(f"{Path(a.blob).name}: SHAVE {blob.numShaves}, 입력 {a.width}x{a.height}, 지연 중앙 {med:.1f} ms · p95 {p95:.1f} ms, 처리량 {fps:.1f} fps (inflight {a.inflight})")
-    if a.out:
-        new = not Path(a.out).exists()
-        with open(a.out, "a", encoding="utf-8") as fh:
-            if new:
-                fh.write("blob,shaves,width,height,latency_ms_median,latency_ms_p95,fps,inflight\n")
-            fh.write(f"{Path(a.blob).name},{blob.numShaves},{a.width},{a.height},{med:.1f},{p95:.1f},{fps:.1f},{a.inflight}\n")
+    print(f"{Path(a.blob).name}: SHAVE {blob.numShaves}, 입력 {a.width}x{a.height}, 지연 중앙 {med:.1f} ms · p95 {p95:.1f} ms, 처리량 {fps:.1f} fps (inflight {a.inflight}, 스레드 {a.threads or '기본'}, 깊이 {a.depth or '끔'})")
+    row = dict(start_time=start_time, link_mbps_start=link0, link_mbps_end=link_mbps(a.nic), blob=Path(a.blob).name, blob_sha256_12=sha256_short(a.blob),
+               shaves=blob.numShaves, width=a.width, height=a.height, depth_fps=a.depth or 0, inference_threads=a.threads or "default",
+               inflight=a.inflight, n=a.n, warmup=a.warmup, latency_ms_median=round(med, 1), latency_ms_p95=round(p95, 1), fps=round(fps, 1),
+               git=git_state(), tag=a.tag)
+    append_row(a.out, row)
 
 
 if __name__ == "__main__":

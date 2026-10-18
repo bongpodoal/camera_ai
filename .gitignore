@@ -20,3 +20,7 @@ example/01_pytorch_pt/**/*.pt
 traffic_light/00_train/datasets/
 # 신호등 NNArchive 는 traffic_light-512x288.tar.xz 만 공개 허락 (이미 추적 중) — 나머지는 ②~⑤ 로 다시 만든다
 traffic_light/05_nnarchive/*.tar.xz
+
+# A-YOLOM 모델 파일은 git 제외 (비공개 취급, 4080 PC 에서 만든 것을 T7 으로 받아 복사)
+a_yolom/05_nnarchive/*.tar.xz
+a_yolom/*.blob

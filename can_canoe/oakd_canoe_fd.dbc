@@ -141,6 +141,15 @@ BO_ 880 DEV_INFO: 8 CAM_PC
  SG_ C4 : 48|8@1+ (1,0) [0|255] "" CANOE
 
 
+BO_ 896 SEG_SUMMARY: 8 CAM_PC
+ SG_ Seq : 0|16@1+ (1,0) [0|65535] "" CANOE
+ SG_ LanePresent : 16|1@1+ (1,0) [0|1] "" CANOE
+ SG_ DaPresent : 17|1@1+ (1,0) [0|1] "" CANOE
+ SG_ LaneConf : 24|8@1+ (0.5,0) [0|100] "%" CANOE
+ SG_ LaneAreaPct : 32|8@1+ (0.5,0) [0|100] "%" CANOE
+ SG_ DaConf : 40|8@1+ (0.5,0) [0|100] "%" CANOE
+ SG_ DaAreaPct : 48|8@1+ (0.5,0) [0|100] "%" CANOE
+
 CM_ BU_ CAM_PC "PC that reads the OAK-D over Ethernet and sends the results on CAN.";
 CM_ BU_ CANOE "CANoe. Its trace time stamp is the single time axis.";
 CM_ BO_ 768 "One per processed camera frame. Seq links this frame to DET_BOX (SeqLo) and to the PC log frames.csv.";
@@ -150,10 +159,10 @@ CM_ SG_ 768 Seq "Camera frame sequence number modulo 65536.";
 CM_ SG_ 768 Fps "Chip processing rate over the last second.";
 CM_ SG_ 768 EdgeMs "Latency inside the camera chip (chip clock minus chip clock, no drift). Not a time axis. 0 = no value (the chip latency had not arrived).";
 CM_ SG_ 768 SeqGap "Frames skipped since the previous message, saturates at 15.";
-CM_ SG_ 768 ModelId "0=yolov6n 1=yolov8n 2=traffic_light 3=traffic_light_11n 4=traffic_light_v8n";
+CM_ SG_ 768 ModelId "0=yolov6n 1=yolov8n 2=traffic_light 3=traffic_light_11n 4=traffic_light_v8n 5=a_yolom_n";
 CM_ SG_ 768 RawOn "0=only detection results are received, 1=raw image is also received over Ethernet";
 CM_ SG_ 784 SeqLo "Low 4 bits of FRAME_STATUS.Seq.";
-CM_ SG_ 784 Label "Class number. traffic_light models: 0=red 1=yellow 2=green 3=off. COCO models: COCO class index.";
+CM_ SG_ 784 Label "Class number. traffic_light models: 0=red 1=yellow 2=green 3=off. COCO models: COCO class index. a_yolom_n: 0=person 1=car 2=tl_red 3=tl_green 4=tl_yellow.";
 CM_ SG_ 784 Conf "Confidence 0..1 as reported by the camera. This is not an accuracy.";
 CM_ SG_ 800 PcMs "PC side latency median over the last second (Ethernet, queue, processing).";
 CM_ SG_ 800 PostMs "Time to draw boxes on the raw image. 0 when RawOn=0.";
@@ -176,6 +185,14 @@ CM_ BO_ 865 "Raw mode. Every 10 s: stereo baseline, valid depth range, class cou
 CM_ BO_ 866 "Raw mode. Every 10 s: network input size, depth on/off, connected camera sockets bit mask (bit0=CAM_A...).";
 CM_ BO_ 880 "Raw mode. Every 10 s: text values in 5-character chunks. StrId 0=device id 1=product name 2=platform 3=bootloader 4=depthai version 5=model. Chunk k holds characters 5k..5k+4, TotalLen = text length.";
 CM_ SG_ 833 FrameType "ImgFrame type enum value.";
+CM_ BO_ 896 "A-YOLOM models only. One per processed camera frame: frame-level lane and drivable-area summary (the masks themselves are not sent on CAN). Seq = FRAME_STATUS.Seq.";
+CM_ SG_ 896 Seq "Camera frame sequence number modulo 65536 (same as FRAME_STATUS.Seq).";
+CM_ SG_ 896 LanePresent "1 = at least 50 mask pixels (in the original image size) are positive for lane.";
+CM_ SG_ 896 DaPresent "1 = at least 50 mask pixels (in the original image size) are positive for drivable area.";
+CM_ SG_ 896 LaneConf "Lane: maximum sigmoid(logit1 - logit0) inside the image area (padding excluded), 0..100 %, 0.5 % steps.";
+CM_ SG_ 896 LaneAreaPct "Lane: positive mask pixels / all pixels of the original image, 0..100 %, 0.5 % steps.";
+CM_ SG_ 896 DaConf "Drivable area: maximum sigmoid(logit1 - logit0) inside the image area (padding excluded), 0..100 %, 0.5 % steps.";
+CM_ SG_ 896 DaAreaPct "Drivable area: positive mask pixels / all pixels of the original image, 0..100 %, 0.5 % steps.";
 BA_DEF_ "BusType" STRING ;
 BA_DEF_ BO_ "GenMsgCycleTime" INT 0 65535;
 BA_DEF_ BO_ "VFrameFormat" ENUM "StandardCAN","ExtendedCAN","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","StandardCAN_FD","ExtendedCAN_FD";
@@ -184,6 +201,7 @@ BA_DEF_DEF_ "GenMsgCycleTime" 0;
 BA_DEF_DEF_ "VFrameFormat" "StandardCAN";
 BA_ "BusType" "CAN";
 BA_ "GenMsgCycleTime" BO_ 800 1000;
+BA_ "GenMsgCycleTime" BO_ 896 0;
 BA_ "VFrameFormat" BO_ 768 14;
 BA_ "VFrameFormat" BO_ 784 14;
 BA_ "VFrameFormat" BO_ 800 14;
@@ -202,3 +220,4 @@ BA_ "VFrameFormat" BO_ 864 14;
 BA_ "VFrameFormat" BO_ 865 14;
 BA_ "VFrameFormat" BO_ 866 14;
 BA_ "VFrameFormat" BO_ 880 14;
+BA_ "VFrameFormat" BO_ 896 14;

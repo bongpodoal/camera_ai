@@ -26,7 +26,8 @@ from can_msgs import BITS_PER_FRAME, ID_FRAME, ID_PERF, MODEL_IDS, decode
 GAP_S = 5.0
 HERE = Path(__file__).resolve().parent
 COCO_CFG = HERE.parent / "example/05_nnarchive/example/yolov6-nano/config.json"
-LABELS = {"traffic_light": ["red", "yellow", "green", "off"], "traffic_light_11n": ["red", "yellow", "green", "off"], "traffic_light_v8n": ["red", "green"]}
+LABELS = {"traffic_light": ["red", "yellow", "green", "off"], "traffic_light_11n": ["red", "yellow", "green", "off"], "traffic_light_v8n": ["red", "green"],
+          "a_yolom_n": ["person", "car", "tl_red", "tl_green", "tl_yellow"]}
 
 
 def label_names(model):

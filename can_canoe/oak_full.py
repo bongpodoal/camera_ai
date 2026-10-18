@@ -85,10 +85,10 @@ def det_ext(det):
 
 
 # ------------------------------------------------------------ CAN 메시지로 바꾸기
-def frame_messages(seq, meta, order, ext):
-    """프레임 하나의 추가 메시지: 메타 5개 + 검출마다 위치·ROI (DET_BOX 와 같은 Index 순서)."""
+def meta_messages(seq, meta):
+    """프레임 하나의 메타 메시지 5개."""
     m = meta
-    msgs = [
+    return [
         make("FRAME_META_A", Seq=seq % 65536, ExposureUs=m["exposure_us"], Iso=m["iso"], ColorTempK=m["color_temp_k"]),
         make("FRAME_META_B", Seq=seq % 65536, LensPos=m["lens_pos"], SourceW=m["source_w"], SourceH=m["source_h"],
              CamInstance=m["cam_instance"], FrameType=m["frame_type"]),
@@ -96,10 +96,19 @@ def frame_messages(seq, meta, order, ext):
         make("FRAME_TIME_DEV", Seq=seq % 65536, TsDeviceUs=m["ts_device_us"] % WRAP, DetLatencyMs=m["det_latency_ms"]),
         make("FRAME_TIME_HOST", Seq=seq % 65536, TsHostUs=m["ts_host_us"] % WRAP, FrameLatencyMs=m["frame_latency_ms"]),
     ]
+
+
+def det_pos_messages(seq, index, e):
+    """검출 하나의 위치(X/Y/Z)와 깊이 ROI (DET_BOX 와 같은 SeqLo·Index)."""
+    return [make("DET_POS", SeqLo=seq % 16, Index=index, X=e["x_mm"], Y=e["y_mm"], Z=e["z_mm"]),
+            make("DET_ROI", SeqLo=seq % 16, Index=index, RoiX=e["roi_x"], RoiY=e["roi_y"], RoiW=e["roi_w"], RoiH=e["roi_h"])]
+
+
+def frame_messages(seq, meta, order, ext):
+    """프레임 하나의 추가 메시지: 메타 5개 + 검출마다 위치·ROI (DET_BOX 와 같은 Index 순서)."""
+    msgs = meta_messages(seq, meta)
     for i, k in enumerate(order):
-        e = ext[k]
-        msgs.append(make("DET_POS", SeqLo=seq % 16, Index=i, X=e["x_mm"], Y=e["y_mm"], Z=e["z_mm"]))
-        msgs.append(make("DET_ROI", SeqLo=seq % 16, Index=i, RoiX=e["roi_x"], RoiY=e["roi_y"], RoiW=e["roi_w"], RoiH=e["roi_h"]))
+        msgs += det_pos_messages(seq, i, ext[k])
     return msgs
 
 

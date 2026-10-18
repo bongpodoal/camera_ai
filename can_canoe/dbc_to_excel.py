@@ -15,13 +15,17 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 HERE = Path(__file__).resolve().parent
+# 사용자 지시(2026-10-13): CANdb 구성(문서·엑셀)에서 깊이 관련과 차선 요약은 제외한다. DBC·송신 코드에는 남아 있다(문서 범위 밖).
+EXCLUDE_MSGS = {"DET_POS", "DET_ROI", "SEG_SUMMARY"}
+EXCLUDE_SIGS = {("CALIB_B", "BaselineCm"), ("CALIB_B", "DepthLoMm"), ("CALIB_B", "DepthHiMm"), ("CALIB_C", "SpatialOn")}
 CANDB_CYCLE_MS = 50          # 교수님 요청: CANdb 송신 주기 열
 
 # 메시지별 실제 데이터 갱신 주기 (can_demo.py 의 송신 구조와 같다). {fps} = 카메라 fps
 PERIOD = {
     "FRAME_STATUS": ("프레임마다", "{frame_ms} ms (={fps:g} fps)"),
-    "DET_BOX": ("검출마다", "프레임마다, 검출 개수만큼 (최대 N개)"),
+    "DET_BOX": ("검출마다", "프레임마다 검출 개수만큼(프레임당 최대 N=8개), {frame_ms} ms 마다 한 프레임분을 묶어 송신"),
     "PERF": ("1초", "1000 ms"),
+    "SEG_SUMMARY": ("프레임마다", "{frame_ms} ms (a_yolom_n 계열 모델)"),
     "DET_POS": ("검출마다", "프레임마다, 검출 개수만큼 (Raw 켬)"),
     "DET_ROI": ("검출마다", "프레임마다, 검출 개수만큼 (Raw 켬)"),
     "FRAME_META_A": ("프레임마다", "{frame_ms} ms (Raw 켬)"),
@@ -38,13 +42,13 @@ PERIOD = {
     "CALIB_C": ("10초", "10000 ms (Raw 켬)"),
     "DEV_INFO": ("10초", "10000 ms (Raw 켬, 문자열 5글자씩 나눠 전송)"),
 }
-RAW_OFF_MSGS = {"FRAME_STATUS", "DET_BOX", "PERF"}
+RAW_OFF_MSGS = {"FRAME_STATUS", "DET_BOX", "PERF", "SEG_SUMMARY"}
 
 # 변수 의미(한글). (메시지, 변수) 가 없으면 변수명만으로 찾고, 그래도 없으면 DBC 영어 주석을 쓴다
 KO = {
     "Seq": "카메라 프레임 번호(65536 에서 돌아옴)", "DetCount": "이 프레임의 검출 개수", "Fps": "칩 처리 속도(최근 1초)",
     "EdgeMs": "칩 안 지연(촬영→검출 결과, 같은 칩 시계라 드리프트 없음). 0=값 없음", "SeqGap": "직전 메시지 이후 건너뛴 프레임 수(최대 15)",
-    "ModelId": "모델 번호(0 yolov6n,1 yolov8n,2 traffic_light,3 traffic_light_11n,4 traffic_light_v8n)", "RawOn": "Raw 켬 여부(0 검출만, 1 영상 등 전부)",
+    "ModelId": "모델 번호(0 yolov6n,1 yolov8n,2 traffic_light,3 traffic_light_11n,4 traffic_light_v8n,5 a_yolom_n)", "RawOn": "Raw 켬 여부(0 검출만, 1 영상 등 전부)",
     "SeqLo": "프레임 번호의 아래 4비트(FRAME_STATUS.Seq 와 연결)", "Index": "검출 순번(0=신뢰도 최고)", "Label": "클래스 번호",
     "Conf": "신뢰도 0~1(카메라 출력값, 정확도 아님)", "Cx": "박스 중심 X(0~1 정규화)", "Cy": "박스 중심 Y(0~1 정규화)", "W": "박스 너비(0~1)", "H": "박스 높이(0~1)",
     "PcMs": "PC 쪽 지연 중앙값(이더넷·큐·처리)", "PostMs": "영상에 박스 그리는 시간(Raw 끔이면 0)", "EthKBps": "카메라→PC 이더넷 수신량(KB/s)",
@@ -63,6 +67,9 @@ KO = {
     "Fx": "초점거리 fx(픽셀)", "Fy": "초점거리 fy(픽셀)", "BaselineCm": "스테레오 기선 길이", "DepthLoMm": "유효 깊이 최소", "DepthHiMm": "유효 깊이 최대",
     "NClasses": "클래스 수", "ConfThresholdPct": "신뢰도 문턱값", "NnInputW": "신경망 입력 너비", "NnInputH": "신경망 입력 높이",
     "SpatialOn": "깊이 위치 계산 켬 여부", "CameraMask": "연결된 카메라 소켓 비트마스크(bit0=CAM_A)",
+    "LanePresent": "차선 있음(1): 입력 크기 마스크의 양성 픽셀 50개 이상", "DaPresent": "주행영역 있음(1): 입력 크기 마스크의 양성 픽셀 50개 이상",
+    "LaneConf": "차선 최고 확신도 %(패딩 제외, 0.5% 단위)", "LaneAreaPct": "차선 마스크 면적 %(양성 픽셀/전체, 0.5% 단위)",
+    "DaConf": "주행영역 최고 확신도 %", "DaAreaPct": "주행영역 마스크 면적 %",
     "StrId": "문자열 종류(0 장치ID,1 제품명,2 플랫폼,3 부트로더,4 depthai 버전,5 모델)", "Chunk": "문자열 조각 번호(k번째=글자 5k~5k+4)", "TotalLen": "문자열 전체 길이",
 }
 for _i in range(5):
@@ -80,13 +87,17 @@ def ctype(sig):
     return base
 
 
-def rows_can(db, fps):
+def rows_can(db, fps, exclude=True):
     frame_ms = round(1000 / fps)
     out = []
     for m in sorted(db.messages, key=lambda x: x.frame_id):
+        if exclude and m.name in EXCLUDE_MSGS:
+            continue
         cat, per = PERIOD[m.name]
         per = per.format(frame_ms=frame_ms, fps=fps)
         for s in m.signals:
+            if exclude and (m.name, s.name) in EXCLUDE_SIGS:
+                continue
             sb, eb = s.start // 8, (s.start + s.length - 1) // 8          # Intel(리틀엔디언) 기준, 0 부터 시작
             rng = f"{s.minimum:g} ~ {s.maximum:g}" if s.minimum is not None else ""
             out.append([m.name, f"0x{m.frame_id:03X}", m.frame_id, s.name, KO_MSG.get((m.name, s.name)) or KO.get(s.name) or (s.comment or "").strip() or (m.comment or ""),
@@ -98,10 +109,10 @@ def rows_can(db, fps):
 def rows_video(fps):
     """② 영상 송출 시 추가되는 영상 항목. 크기는 설정값 기준 계산(실측 아님) → 실측 후 보완."""
     items = [
-        ("RGB 프레임(신경망이 처리한 영상)", "신경망 입력과 같은 크기의 컬러 영상. 모델마다 다름", "uint8 × (W×H×3, BGR 평면)",
-         "traffic_light 416×416", 416 * 416 * 3),
-        ("RGB 프레임(yolov6n 입력)", "yolov6n 입력 크기", "uint8 × (W×H×3)", "512×288", 512 * 288 * 3),
-        ("깊이 프레임(depth)", "스테레오 깊이 지도(밀리미터). 640×400 가정 — 실측으로 확인", "uint16 × (W×H)", "640×400 (가정)", 640 * 400 * 2),
+        ("RGB 프레임(신경망이 처리한 영상)", "신경망 입력과 같은 크기의 컬러 영상 (A-YOLOM(n) 512×288)", "uint8 × (W×H×3, BGR 평면)", "512×288", 512 * 288 * 3),
+        ("1채널 영상 또는 마스크", "512×288 1채널(흑백 영상·마스크 한 장)", "uint8 × (W×H)", "512×288", 512 * 288),
+        ("신경망 원시 출력(마스크 logit 포함)", "det_p3/p4/p5 + 분할 logit. 모든 조건에서 이더넷으로 옴 (호스트 디코딩에 필요). FP16 가정", "FP16 × (69×(36·64+18·32+9·16) + 2×2·288·512)",
+         "원본 ft1", 69 * (36 * 64 + 18 * 32 + 9 * 16) * 2 + 2 * 288 * 512 * 2),
     ]
     out = []
     for name, meaning, ctype_, size_txt, nbytes in items:
@@ -136,11 +147,11 @@ def build(db, fps, path):
     for line in [
         "분류: ① 영상 미송출 = 영상 스트림을 받지 않고 CAN 으로 보내는 값 / ② 영상 송출 = ① + 영상(RGB·깊이) 이더넷 수신",
         "시작/끝 byte: Intel(리틀엔디언) 기준, 메시지의 0번째 byte 부터 센 값. 한 변수가 여러 byte 에 걸치면 시작~끝",
-        f"CANdb 송신 주기 {CANDB_CYCLE_MS} ms: 교수님 요청 열. 카메라 값은 {fps:g} fps(={round(1000/fps)} ms)마다 갱신되므로 50 ms 로 보내면 4번 중 1번만 새 값이다.",
+        f"CANdb 수신 주기 {CANDB_CYCLE_MS} ms: 교수님 요청 열(수신 노드가 이 간격으로 값을 읽는다는 기준). 실제 송신은 {fps:g} fps(={round(1000/fps)} ms) 프레임 단위·1초·10초 이벤트 송신이며 {CANDB_CYCLE_MS} ms 반복 송신이 아니다 → 수신을 {CANDB_CYCLE_MS} ms 로 읽으면 4번 중 1번만 새 값. DBC 의 GenMsgCycleTime 은 PERF=1000 만 값이 있고 나머지는 0(이벤트)이라 이 열과 다르다.",
         "업데이트 주기가 '미설정'인 항목은 없음(모두 코드의 송신 주기를 적었다). 정해지지 않으면 '미설정'으로 쓴다.",
         "영상 크기·대역폭은 설정값 기준 계산이다. 카메라 연결 후 실측(EthKBps)으로 보완한다.",
         "카메라는 USB 가 아니라 PoE 이더넷으로 연결돼 있어 '송신 경로'는 이더넷 기준으로 정리했다.",
-        f"변수 {len(can_rows)}개 / 메시지 {len(db.messages)}개 (DBC 에서 자동 생성)",
+        f"변수 {len(can_rows)}개 / 메시지 {len({r[0] for r in can_rows})}개 (DBC 에서 자동 생성, 깊이 관련·차선 요약 제외: {', '.join(sorted(EXCLUDE_MSGS))} 전체와 CALIB_B 의 BaselineCm·DepthLoMm·DepthHiMm, CALIB_C 의 SpatialOn)",
     ]:
         ws3.append([line])
     fill, bold = PatternFill("solid", fgColor="DDEBF7"), Font(bold=True)

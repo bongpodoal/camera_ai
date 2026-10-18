@@ -9,6 +9,9 @@
 #            DURATION(초, 기본 300)  FPS(기본 5)
 #            MODELS(기본 "yolov6n traffic_light_v8n traffic_light")  RAWS(기본 "off on")  — 일부만 돌릴 때: MODELS=traffic_light RAWS=on DURATION=60
 #
+#            A-YOLOM(n) 비교: MODELS=a_yolom_n RAWS="off on" FPS=4 NIC=enp6s0 (깊이 켬은 5 fps 를 못 지켜 4 fps 로 같이 맞춤, 5 fps Raw 켬은 60초로 따로: MODELS=a_yolom_n RAWS=on FPS=5 DURATION=60)
+#            a_yolom_n --raw on 은 AI 결과(NMS 전 후보·분할 점수)를 실행 폴더의 raw_ai_*.csv 로 기록한다 (끄려면 can_demo 에 --raw-log off).
+#
 # Raw 켬 = 카메라로 받을 수 있는 모든 데이터 (깊이·텔레메트리·보정·장치 정보 + RGB·깊이 프레임). can_canoe/MEASURE.md 참고.
 set -u
 cd "$(dirname "$0")"

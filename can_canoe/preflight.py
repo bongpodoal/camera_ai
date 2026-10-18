@@ -15,6 +15,7 @@ ROOT = HERE.parent
 ARCHIVES = {
     "traffic_light_v8n": "traffic_light/05_nnarchive/traffic_light_v8n-416x416.tar.xz",
     "traffic_light": "traffic_light/05_nnarchive/traffic_light-416x416.tar.xz",
+    "a_yolom_n": "a_yolom/05_nnarchive/a_yolom_n_cam01_ft1-512x288-6shave.tar.xz",
 }
 bad = []
 

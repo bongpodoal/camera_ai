@@ -1,8 +1,10 @@
 import argparse
 import csv
 import json
+import os
 import random
 import statistics
+import sys
 import threading
 import time
 from collections import deque
@@ -11,7 +13,9 @@ from pathlib import Path
 import can
 
 import oak_full
-from can_msgs import BITS_PER_FRAME, MODEL_IDS, det_box, frame_status, open_bus, perf, set_fd_frames
+from model_candidates.measure_log import git_state, link_mbps, now_iso, sha256_short
+from a_yolom.a_yolom_source import AYolomFake, AYolomSource
+from can_msgs import BITS_PER_FRAME, MODEL_IDS, det_box, frame_status, open_bus, perf, seg_summary, set_fd_frames
 
 ROOT = Path(__file__).resolve().parents[1]
 DET_EXT_COLS = ('x_mm', 'y_mm', 'z_mm', 'roi_x', 'roi_y', 'roi_w', 'roi_h')
@@ -20,6 +24,7 @@ ARCHIVES = {
     "traffic_light": "traffic_light/05_nnarchive/traffic_light-416x416.tar.xz",
     "traffic_light_11n": "traffic_light/05_nnarchive/traffic_light_11n-416x416.tar.xz",
     "traffic_light_v8n": "traffic_light/05_nnarchive/traffic_light_v8n-416x416.tar.xz",
+    "a_yolom_n": "a_yolom/05_nnarchive/a_yolom_n_cam01_ft1-512x288-6shave.tar.xz",
 }
 FULL_SHAVES = 6
 ARCHIVES_FULL = {
@@ -222,6 +227,12 @@ def main(argv=None):
     ap.add_argument("--data-bitrate", type=int, default=2000000, help="--fd 일 때 데이터 구간 속도")
     ap.add_argument("--fd-frames", action="store_true", help="메시지를 CAN FD 프레임(BRS 켬)으로 보냄. 안 주면 클래식 프레임")
     ap.add_argument("--max-dets", type=int, default=8)
+    ap.add_argument("--video", choices=("on", "off"), help="a_yolom_n: 영상(RGB·깊이 프레임) 이더넷 송출. 안 주면 --raw 를 따라감. Raw(숫자 데이터·기록)와 독립으로 켜고 끈다")
+    ap.add_argument("--conf", type=float, default=0.25)
+    ap.add_argument("--variant")
+    ap.add_argument("--seg-min-pixels", type=int, default=50)
+    ap.add_argument("--raw-log", choices=("on", "off"), default="on")
+    ap.add_argument("--raw-tensors-every", type=float, default=0.0)
     ap.add_argument("--edge-wait", type=float, default=0.0,
                     help="칩 지연값(EdgeMs)이 늦게 온 프레임을 최대 이 시간(초) 기다렸다 보낸다. 기본 0 = 기다리지 않음 (기다리면 그 프레임 송신이 약 20 ms 늦어 간격 지터가 생김, 안 기다리면 늦은 프레임의 EdgeMs 는 0 = 값 없음)")
     ap.add_argument("--nic", default="", help="OAK-D 가 꽂힌 이더넷 이름(예: enp5s0). 있으면 실제 수신 바이트를 잰다")
@@ -235,6 +246,16 @@ def main(argv=None):
 
     out = Path(a.out_dir).expanduser()
     out.mkdir(parents=True, exist_ok=True)
+    t_wall, link0 = now_iso(), link_mbps(a.nic or "enp6s0")      # 모든 실행에 시작 시각·링크 속도·모델 파일을 파일로 남긴다
+    arch = Path(a.archive).expanduser() if a.archive else (ROOT / ARCHIVES[a.model] if a.model in ARCHIVES else None)
+    run_info = dict(start_time=t_wall, argv=sys.argv, args=vars(a), link_mbps_start=link0, archive=str(arch) if arch else "(공식 모델 이름)",
+                    archive_sha256_12=sha256_short(arch) if arch else "", git=git_state(), host=os.uname().nodename, python=sys.version.split()[0])
+    try:
+        import depthai as _dai
+        run_info["depthai"] = _dai.__version__
+    except ImportError:
+        pass
+    (out / "run_info.json").write_text(json.dumps(run_info, indent=1, ensure_ascii=False, default=str), encoding="utf-8")
     if a.mode == "debug":
         (out / "images").mkdir(exist_ok=True)
     kw = {} if a.interface == "virtual" else {"bitrate": a.bitrate}
@@ -243,7 +264,12 @@ def main(argv=None):
     set_fd_frames(a.fd_frames)
     channel = int(a.channel) if a.channel.isdigit() else a.channel
     bus = open_bus(a.interface, channel, **kw)
-    source = FakeSource(a) if a.fake else OakSource(a)
+    if a.video and a.model != "a_yolom_n":
+        raise SystemExit("--video 는 --model a_yolom_n 에서만 쓸 수 있다")
+    if a.model == "a_yolom_n":
+        source = AYolomFake(a) if a.fake else AYolomSource(a, str(ROOT / ARCHIVES["a_yolom_n"]), EDGE_SCRIPT, DROP_SCRIPT)
+    else:
+        source = FakeSource(a) if a.fake else OakSource(a)
     stop = threading.Event()
 
     rows, can_tx, can_err, dropped = [], 0, 0, 0
@@ -316,12 +342,18 @@ def main(argv=None):
             order = sorted(range(len(f["dets"])), key=lambda i: -f["dets"][i][1])[:min(a.max_dets, 16)]
             for i, k in enumerate(order):
                 send(det_box(f["seq"], i, *f["dets"][k]))
+            if f.get("seg"):
+                send(seg_summary(f["seq"], *f["seg"]))
             ext = f.get("ext") or [{}] * len(f["dets"])
             if a.mode == "debug":
                 for d, e in zip(f["dets"], ext):
                     det_rows.append([f["seq"], *d, *(e.get(k, "") for k in DET_EXT_COLS)])
             if a.raw == "on":
-                for m in oak_full.frame_messages(f["seq"], f["meta"], order, f["ext"]):
+                if f.get("ext") is None:                # a_yolom_n: 깊이 좌표는 칩이 돌려주는 대로 아래에서 따로 보냄 (프레임 박스보다 최대 1프레임 늦음)
+                    msgs = oak_full.meta_messages(f["seq"], f["meta"])
+                else:
+                    msgs = oak_full.frame_messages(f["seq"], f["meta"], order, f["ext"])
+                for m in msgs:
                     send(m)
                 for t in f["tele"]:
                     tele_rows.append(t)
@@ -331,6 +363,11 @@ def main(argv=None):
                     last_session = now
                     for m in oak_full.session_messages(source.session):
                         send(m)
+            if hasattr(source, "pop_ready"):          # 칩이 계산해 돌려준 깊이 좌표 (SeqLo·Index 로 DET_BOX 와 연결)
+                for seq_r, dets_r, ext_r in source.pop_ready():
+                    for i, e in enumerate(ext_r):
+                        for m in oak_full.det_pos_messages(seq_r, i, e):
+                            send(m)
             if f["frame"] is not None and now - last_save >= a.save_every:
                 import cv2
                 cv2.imwrite(str(out / "images" / f"{f['seq']:06d}.jpg"), f["frame"])
@@ -384,7 +421,9 @@ def main(argv=None):
                    post_ms=med([r["post_ms"] for r in rows]), eth_MBps=round(eth / 1e6, 3),
                    eth_source="nic" if nic0 is not None else "raw_frames_only",
                    can_tx_frames=can_tx, can_tx_errors=can_err,
-                   can_tx_load_pct=round(100 * can_tx / dur * BITS_PER_FRAME / a.bitrate, 2))
+                   can_tx_load_pct=round(100 * can_tx / dur * BITS_PER_FRAME / a.bitrate, 2),
+                   start_time=t_wall, link_mbps_start=link0, link_mbps_end=link_mbps(a.nic or "enp6s0"), archive=Path(run_info["archive"]).name, video=("on" if getattr(source, "video", a.raw == "on") else "off"),
+                   variant=getattr(source, "variant", ""), calibration=getattr(source, "calib_note", ""), git=run_info["git"])
     sp = out / "summary.csv"
     new = not sp.exists()
     with open(sp, "a", newline="") as fh:
