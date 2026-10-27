@@ -289,7 +289,7 @@ def main(argv=None):
     ap.add_argument("--data-bitrate", type=int, default=2000000, help="--fd 일 때 데이터 구간 속도")
     ap.add_argument("--fd-frames", action="store_true", help="메시지를 CAN FD 프레임(BRS 켬)으로 보냄. 안 주면 클래식 프레임")
     ap.add_argument("--max-dets", type=int, default=8)
-    ap.add_argument("--video", choices=("on", "off"), help="a_yolom_n: 영상(RGB·깊이 프레임) 이더넷 송출. 안 주면 --raw 를 따라감. Raw(숫자 데이터·기록)와 독립으로 켜고 끈다")
+    ap.add_argument("--video", choices=("on", "off", "rgb"), help="a_yolom_n: 영상 이더넷 송출. on = RGB+깊이 프레임, rgb = RGB 프레임만, off = 안 보냄. 안 주면 --raw 를 따라감. Raw(숫자 데이터·기록)와 독립으로 켜고 끈다. RGB 만의 지연 비교는 --raw on 에서 off 와 rgb 를 비교")
     ap.add_argument("--conf", type=float, default=0.25, help="a_yolom_n 의 검출 신뢰도 문턱값 (호스트 디코딩에서 적용)")
     ap.add_argument("--variant", help="a_yolom_n 의 변형 이름(original|v1|v2a|v2b|v2c|v3). 안 주면 --archive 파일명에서 읽는다")
     ap.add_argument("--seg-min-pixels", type=int, default=50, help="a_yolom_n: 차선·주행영역 present 판정 최소 양성 픽셀 수 (신경망 입력 크기 마스크 기준)")
@@ -492,7 +492,7 @@ def main(argv=None):
                    eth_source="nic" if nic0 is not None else "raw_frames_only",
                    can_tx_frames=can_tx, can_tx_errors=can_err,
                    can_tx_load_pct=round(100 * can_tx / dur * BITS_PER_FRAME / a.bitrate, 2),
-                   start_time=t_wall, link_mbps_start=link0, link_mbps_end=link_mbps(a.nic or "enp6s0"), archive=Path(run_info["archive"]).name, video=("on" if getattr(source, "video", a.raw == "on") else "off"),
+                   start_time=t_wall, link_mbps_start=link0, link_mbps_end=link_mbps(a.nic or "enp6s0"), archive=Path(run_info["archive"]).name, video=(a.video if a.video == "rgb" else ("on" if getattr(source, "video", a.raw == "on") else "off")),
                    variant=getattr(source, "variant", ""), calibration=getattr(source, "calib_note", ""), git=run_info["git"])
     sp = out / "summary.csv"
     new = not sp.exists()

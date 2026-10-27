@@ -24,3 +24,10 @@ traffic_light/05_nnarchive/*.tar.xz
 # A-YOLOM 모델 파일은 git 제외 (비공개 취급, 4080 PC 에서 만든 것을 T7 으로 받아 복사)
 a_yolom/05_nnarchive/*.tar.xz
 a_yolom/*.blob
+# models/ 는 복사본 — 원본 규칙과 같게 큰 모델 파일은 제외 (신호등 512x288 NNArchive 만 예외)
+models/**/*.pt
+models/**/*.onnx
+models/**/*.bin
+models/**/*.blob
+models/**/*.tar.xz
+!models/traffic_light_yolo11s/model/05_nnarchive/traffic_light-512x288.tar.xz

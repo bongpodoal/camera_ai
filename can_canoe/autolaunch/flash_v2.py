@@ -27,3 +27,7 @@ bootloader = dai.DeviceBootloader(info)
 print(f"부트로더 버전: {bootloader.getVersion()}")
 bootloader.flash(lambda p: print(f"\r플래시 {p * 100:5.1f}%", end="", flush=True), pipeline)
 print("\n완료. 카메라 전원을 껐다 켜면 PC 없이 시작한다. 결과는 UDP 로 온다: python3 listen_udp.py --port", a.dest_port)
+
+
+
+

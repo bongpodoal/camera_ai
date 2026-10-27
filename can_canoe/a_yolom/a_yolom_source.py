@@ -340,7 +340,9 @@ class _SourceBase:
     def __init__(self, args):
         self.args = args
         self.raw = args.raw == "on"
-        self.video = (args.video == "on") if getattr(args, "video", None) else self.raw
+        vmode = getattr(args, "video", None)          # on = RGB+깊이 프레임, rgb = RGB 프레임만, off = 둘 다 안 보냄 (안 주면 --raw 를 따름)
+        self.video = (vmode in ("on", "rgb")) if vmode else self.raw
+        self.video_depth = (vmode == "on") if vmode else self.raw
         self.edge_by_seq, self.meta_by_seq, self.edge_queue, self.meta_queue = {}, {}, None, None
         self.ready = deque()          # (seq, dets, ext 목록): 칩이 깊이 좌표를 돌려주면 쌓인다 (can_demo 가 꺼내 CAN 으로 보냄)
         self.session = None
@@ -421,7 +423,8 @@ class AYolomSource(_SourceBase):
         import depthai as dai
         a = self.args
         raw, video, debug = self.raw, self.video, a.mode == "debug"
-        need_depth = raw or video
+        video_depth = self.video_depth
+        need_depth = raw or video_depth
         archive = self._archive(dai)
         device = dai.Device(dai.DeviceInfo(a.ip))
         out_dir = Path(a.out_dir).expanduser()
@@ -431,8 +434,8 @@ class AYolomSource(_SourceBase):
                          self.raw_logger.logger if self.raw_logger else None)
         dc = None
         if getattr(a, "depth_check", "off") == "on":
-            if not (debug and video):
-                print("경고: --depth-check on 은 --mode debug 와 영상 송출(--video on) 이 필요해 무시합니다")
+            if not (debug and video and video_depth):
+                print("경고: --depth-check on 은 --mode debug 와 영상 송출(--video on, RGB+깊이) 이 필요해 무시합니다")
             else:
                 dc = DepthCheck(out_dir, window=not getattr(a, "no_window", False))
         with dai.Pipeline(device) as pipeline:
@@ -454,9 +457,10 @@ class AYolomSource(_SourceBase):
             self.edge_queue = edge_q = edge_script.outputs["edge"].createOutputQueue()
             frame_q = depth_q = sys_q = calc_q = cfg_q = None
             stereo = make_stereo_depth(pipeline, dai, a.fps, self.w, self.h) if need_depth else None
-            if video:                                         # 영상 송출: RGB 프레임(+ 깊이 프레임)을 이더넷으로
+            if video:                                         # 영상 송출: RGB 프레임(+ --video on 이면 깊이 프레임)을 이더넷으로
                 frame_q = net.passthrough.createOutputQueue(maxSize=4, blocking=False)
-                depth_q = stereo.depth.createOutputQueue(maxSize=4, blocking=False)
+                if video_depth:
+                    depth_q = stereo.depth.createOutputQueue(maxSize=4, blocking=False)
             if raw:                                           # Raw 숫자 데이터: 칩 안에서 계산해 숫자만 받는다
                 meta_script = pipeline.create(dai.node.Script)
                 meta_script.setScript(META_SCRIPT)
@@ -499,7 +503,7 @@ class AYolomSource(_SourceBase):
                     depth_bytes, depth_frame = 0, None
                     if frame_msg is not None:
                         raw_bytes = int(frame_msg.getData().nbytes)
-                        depth_msgs = depth_q.tryGetAll()
+                        depth_msgs = depth_q.tryGetAll() if depth_q is not None else []
                         depth_bytes = sum(int(m.getData().nbytes) for m in depth_msgs)
                         if debug:                              # 디버그 모드: 영상을 변환하고 마스크·박스를 그린다 (실차 모드는 하지 않음 → 후처리 시간 비교용)
                             t_draw = time.perf_counter()
@@ -581,9 +585,9 @@ class AYolomFake(_SourceBase):
                             self.raw_logger.add_spatial(prev[0], prev[1], ext)
                     prev = (seq, res["dets"][:a.max_dets])
                     extra = dict(meta=oak_full.fake_meta(seq), ext=None, tele=tele,
-                                 depth_bytes=self.w * self.h * 2 if self.video else 0, depth_frame=None)
+                                 depth_bytes=self.w * self.h * 2 if self.video_depth else 0, depth_frame=None)
                 yield dict(seq=seq, dev_t=dev_t, t_pc=time.time(), total_ms=edge + 8, post_ms=res["post_ms"],
-                           raw_bytes=(self.w * self.h * 3 + self.w * self.h * 2) if self.video else 0, frame=None,
+                           raw_bytes=(self.w * self.h * 3 + (self.w * self.h * 2 if self.video_depth else 0)) if self.video else 0, frame=None,
                            dets=res["dets"], seg=res["seg"], **extra)
                 time.sleep(max(0, t0 + seq / a.fps - time.monotonic()))
         finally:
